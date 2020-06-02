@@ -1,1 +1,1 @@
-# higher-order-networks-grinnell
+# Software for Higher-order Networks
