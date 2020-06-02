@@ -1,0 +1,7 @@
+name = "HigherOrderNetworks"
+uuid = "6f6a334d-9044-495a-bc2b-8b1543872cbf"
+authors = ["Charun Upara <uparacha@grinnell.edu>"]
+version = "0.1.0"
+
+[deps]
+MatrixNetworks = "4f449596-a032-5618-b826-5a251cb6dc11"
