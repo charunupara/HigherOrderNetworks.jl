@@ -37,17 +37,21 @@ using Test
     end
 
     @testset "_morton_decode3" begin
-        #=@test _morton_decode3(Integer[], 2, 8) == (1,1,1)
+        @test _morton_decode3(Integer[], 2, 8) == (1,1,1)
         @test _morton_decode3([0], 2, (2,2,2)) == (1,1,1)
         @test _morton_decode3([1], 2, (2,2,2)) == (1,1,2)
         @test _morton_decode3([7], 2, (2,2,2)) == (2,2,2)
         @test _morton_decode3([0,0], 2, (4,4,4)) == (1,1,1)
-        @test _morton_decode3([3,4], 2, (4,4,4)) == (4,1,2)=#
+        @test _morton_decode3([3,4], 2, (4,4,4)) == (4,1,2)
         @test _morton_decode3([7,1,2], 2, (8,8,8)) == (4,5,7)
     end
 
     @testset "hyperkron_graph" begin
         G, _ = hyperkron_graph(kron_params(0.4, 0.8, 0.2, 0.5), 3)
         @test all([G.colptr[i] != G.rowval[i] for i = 1:size(G,1)]) # no self-loops
+        @test maximum(G.nzval) == 1
+        @test minimum(G.nzval) == 1
+        @test typeof(G) == SparseMatrixCSC{Float64, Int64}
+        @test G.m == G.n
     end
 end
