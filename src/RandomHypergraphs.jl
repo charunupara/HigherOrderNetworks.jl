@@ -48,7 +48,9 @@ end
 `pairwise_reshuffle!`
 =====================
 
-Performs a pairwise reshuffle on the edges numbered `e1` and `e2`.
+Performs a pairwise reshuffle on the edges numbered `e1` and `e2`. A pairwise
+shuffle is an operation that randomly swaps nodes between two edges while
+leaving their intersection untouched.
 """
 function pairwise_reshuffle!(h::Hypergraphs, e1::Int64, e2::Int64)
    @assert 0 < e1 <= h.m && 0 < e2 <= h.m # Edges to be reshuffled are valid
@@ -66,7 +68,7 @@ function pairwise_reshuffle_v!(h::VertexHypergraph, e1::Int64, e2::Int64)
 
    h.edges[e1] = copy(inter) # Initialize e1 as intersection
 
-   for i = 1:h.K[e1] - size(inter,1) # Randomly assign |e1 \ e2| random nodes to e1
+   for i = 1:h.K[e1] - size(inter,1) # Randomly assign |e1 \ e2| nodes to e1
       new_n = rand(exclu)
       push!(h.edges[e1], new_n)
       setdiff!(exclu, [new_n])
@@ -75,4 +77,23 @@ function pairwise_reshuffle_v!(h::VertexHypergraph, e1::Int64, e2::Int64)
    h.edges[e2] = [inter; exclu] # Assign the rest to e2
 end
 
-function pairwise_reshuffle_s!() end # STUB
+function pairwise_reshuffle_s!(h::StubHypergraph, e1::Int64, e2::Int64)
+   inter = Set(filter(x -> x in Int.(floor.(h.edges[e2])), Int.(floor.(h.edges[e1])))) # Get the set of intersection nodes
+   exclu = filter(x -> !(Int(floor(x)) in inter), [h.edges[e1]; h.edges[e2]]) # Get stubs that are not in intersection
+   filter!(x -> Int(floor(x)) in inter, h.edges[e1]) # Set e1 and e2 to only the stubs that are in the intersection
+   filter!(x -> Int(floor(x)) in inter, h.edges[e2])
+
+   for i = 1:h.K[e1] - length(inter)
+      new_n = rand(exclu)
+      push!(h.edges[e1], new_n)
+      setdiff!(exclu, [new_n])
+   end
+
+   h.edges[e2] = [h.edges[e2]; exclu]
+end
+
+#=g = StubHypergraph([[1.5,2.5],[2.33333333,3.5],[1.33333333,4.5]], 4, 3)
+println(g)
+pairwise_reshuffle_s!(g, 1, 3)
+println(g)
+println()=#
