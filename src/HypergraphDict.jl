@@ -1,6 +1,5 @@
 """
 Represents a Hypergraph as an incidence matrix.
-
 # Fields
 - `vals::Vector{Float64}`: The nonzero values of the matrix
 - `n::Int64`: The number of nodes
@@ -12,25 +11,25 @@ Represents a Hypergraph as an incidence matrix.
 
 # abstract type hg{T} <: Number end
 
-mutable struct VertexHypergraphs{T}
+mutable struct VertexHypergraph{T}
    vals::Vector{T}
-   n::T
-   m::T
-   D::Vector{T}
-   K::Vector{T}
-   edges::Vector{Vector{T}}
+   n::Int64
+   m::Int64
+   D::Vector{Int64}
+   K::Vector{Int64}
+   edges::Vector{Vector{Int64}}
 end
 
 """
 The nth stub for node `i` is stored as `i + 1/(n+1)`
 """
-mutable struct StubHypergraphs{T}
+mutable struct StubHypergraph{T}
    vals::Vector{T}
-   m::T
-   n::T
-   D::Vector{T}
-   K::Vector{T}
-   edges::Vector{Vector{T}}
+   n::Int64
+   m::Int64
+   D::Vector{Int64}
+   K::Vector{Int64}
+   edges::Vector{Vector{Float64}}
 end
 
 """
@@ -38,41 +37,22 @@ Verifies that the number of nodes and edges match `n` and `m` and that
 all nodes are less than `n`. If successful, returns the degree and edge dimension sequences.
 For VertexHypergraphs
 """
-function Hypergraph_kernel(edges::Vector{Vector{T}}, vals::Vector{T},
-                           n::T, m::T) where T <: Number
+function Hypergraph_kernel(edges::Vector{Vector{Te}}, vals::Vector{T},
+                           n::Int64, m::Int64) where Te <: Number where T
    @assert size(edges, 1) == m # m is the number of edges
    @assert size(vals, 1) == n # Each node has a val associated with it
    @assert all([0 < edges[i][j] < n + 1 for i = 1:m for j = 1:size(edges[i], 1)]) # No node exceeds n
 
    count(v, e) = sum([i == e ? 1 : 0 for k = 1:m for i in v[k]])
 
-   D::Vector{T} = [count(edges, v) for v = 1:n]
-   K::Vector{T} = [size(edges[e], 1) for e = 1:m]
+   D::Vector{Int64} = [count(edges, v) for v = 1:n]
+   K::Vector{Int64} = [size(edges[e], 1) for e = 1:m]
 
    return D, K
 end
 
-"""
-Verifies that the number of nodes and edges match `n` and `m` and that
-all nodes are less than `n`. If successful, returns the degree and edge dimension sequences.
-For StubHypergraphs
-"""
-function Hypergraph_kernel(edges::Vector{Vector{T}}, vals::Vector{T},
-                           n::T, m::T) where T <: Number
-   @assert size(edges, 1) == m # m is the number of edges
-   @assert size(vals, 1) == n # Each node has a val associated with it
-   @assert all([0 < edges[i][j] < n + 1 for i = 1:m for j = 1:size(edges[i], 1)]) # No node exceeds n
-
-   count(v, e) = sum([i == e ? 1 : 0 for k = 1:m for i in v[k]])
-
-   D::Vector{T} = [count(edges, v) for v = 1:n]
-   K::Vector{T} = [size(edges[e], 1) for e = 1:m]
-
-   return D, K
-end
-
-function VertexHypergraph(edges::Vector{Vector{T}}, vals::Vector{T},
-                          n::T, m::T) where T <: Number
+function VertexHypergraph(edges::Vector{Vector{Int64}}, vals::Vector{T},
+                          n::Int64, m::Int64) where T
    D, K = Hypergraph_kernel(edges, vals, n, m)
    return VertexHypergraph(vals, n, m, D, K, edges)
 end
@@ -94,9 +74,9 @@ Creates StubHypergraph with all node values as ones
 """
 StubHypergraph(edges::Vector{Vector{Float64}}, n::Int64, m::Int64) = StubHypergraph(edges, ones(m), n, m)
 
-function StubMatching(D::Vector{T}, K::Vector{T}; vals=ones(size(D,1))) where T <: Number
-   hypergraph = StubHypergraph(Vector{Vector{T}}(), 0, 0)
-   stubs::Vector{Vector{T}} = [[i+(1/(n+1)) for n = 1:D[i]] for i = 1:size(D,1)]
+function StubMatching(D::Vector{Int64}, K::Vector{Int64}; vals=ones(size(D,1)))
+   hypergraph = StubHypergraph(Vector{Vector{Float64}}(), 0, 0)
+   stubs::Vector{Vector{Float64}} = [[i+(1/(n+1)) for n = 1:D[i]] for i = 1:size(D,1)]
    for k = 1:size(K,1)
       edge = zeros(K[k])
       for d = 1:K[k]
@@ -119,7 +99,3 @@ function StubMatching(D::Vector{T}, K::Vector{T}; vals=ones(size(D,1))) where T 
 end
 
 print(VertexHypergraph(StubMatching([3,2,2,2], [4,3,2])))
-
-
-
-#print(VertexHypergraph(StubHypergraph(Dict(1 => [1.5,2.5,3.5,4.5], 2 => [1.33,2.33,4.33], 3 => [2.25,3.25]), ones(4), 4, 3)))
