@@ -1,9 +1,9 @@
+abstract type Hypergraphs end
+
 """
 `VertexHypergraph{T}`
 =====================
-
 Represents a vertex-labeled hypergraph as a list of edges.
-
 Fields
 ------
    - `vals::Vector{T}`: The values corresponding to each node
@@ -13,7 +13,7 @@ Fields
    - `K::Vector{Int64}`: The edge dimension sequence
    - `edges::Vector{Vector{Int64}}`: The hyperedges and their members
 """
-mutable struct VertexHypergraph{T}
+mutable struct VertexHypergraph{T} <: Hypergraphs
    vals::Vector{T}
    n::Int64
    m::Int64
@@ -25,9 +25,7 @@ end
 """
 `StubHypergraph{T}`
 ===================
-
 Represents a stub-labeled hypergraph as a list of edges.
-
 Fields
 ------
    - `vals::Vector{T}`: The values corresponding to each node
@@ -36,11 +34,10 @@ Fields
    - `D::Vector{Int64}`: The degree sequence
    - `K::Vector{Int64}`: The edge dimension sequence
    - `edges::Vector{Vector{Float64}}`: The hyperedges and their members
-
 Note: The nth stub of node i is represented as `i + \\tfrac{1}{n+1}`.
 E.g., `2_2 \\rightarrow \\tfrac{7}{3}` and `4_1 \\rightarrow \\tfrac{9}{2}`
 """
-mutable struct StubHypergraph{T}
+mutable struct StubHypergraph{T} <: Hypergraphs
    vals::Vector{T}
    n::Int64
    m::Int64
@@ -57,11 +54,10 @@ Verifies that:
    - The number of vals == `n`
    - All nodes are between 0 and `n`
    - If StubHypergraph, that all stub numberings are valid and none are skipped
-
 If all conditions are met, returns degree and edge dimension sequences
 """
 function Hypergraph_kernel(edges::Vector{Vector{Te}}, vals::Vector{T},
-                           n::Int64, m::Int64) where Te <: Number where T
+                           n::Int64, m::Int64) where Te <: Real where T
    @assert size(edges, 1) == m # m is the number of edges
    @assert size(vals, 1) == n # Each node has a val associated with it
    @assert all([0 < edges[i][j] < n + 1 for i = 1:m for j = 1:size(edges[i], 1)]) # No node exceeds n
@@ -81,13 +77,11 @@ end
 
 """
 VertexHypergraph constructors.
-
 Functions
 ---------
    - VertexHypergraph(edges, vals, n, m): Produces a vertex-labeled hypergraph with the given edge set, values, and size
    - VertexHypergraph(edges, n, m): Produces a vertex-labeled hypergraph with the given edge set and size, with all values as 1.0
    - VertexHypergraph(s): Converts a stub-labeled hypergraph into a vertex-labeled hypergraph
-
 Examples
 --------
 ~~~~
@@ -102,17 +96,15 @@ function VertexHypergraph(edges::Vector{Vector{Int64}}, vals::Vector{T},
    return VertexHypergraph(vals, n, m, D, K, edges)
 end
 
-VertexHypergraph(edges::Vector{Vector{Int64}}, n::Int64, m::Int64) = VertexHypergraph(edges, ones(m), n, m)
+VertexHypergraph(edges::Vector{Vector{Int64}}, n::Int64, m::Int64) = VertexHypergraph(edges, ones(n), n, m)
 VertexHypergraph(s::StubHypergraph) = VertexHypergraph([Int64.(floor.(s.edges[i])) for i = 1:s.m], s.vals, s.n, s.m)
 
 """
 StubHypergraph constructors.
-
 Functions
 ---------
    - StubHypergraph(edges, vals, n, m): Produces a stub-labeled hypergraph with the given edge set, values, and size
    - StubHypergraph(edges, n, m): Produces a stub-labeled hypergraph with the given edge set and size, with all values as 1.0
-
 Examples
 --------
 ~~~~
@@ -120,10 +112,34 @@ StubHypergraph([[1.33333333,2.5], [3.5,4.5], [1.5,4.33333333]], ["One", "Two", "
 StubHypergraph([[1.5,2.33333333], [1.33333333,2.5]], 2, 2)
 ~~~~
 """
-function StubHypergraph(edges::Vector{Vector{T}}, vals::Vector{T},
-                        n::Int64, m::Int64) where T <: Number
+function StubHypergraph(edges::Vector{Vector{Float64}}, vals::Vector{T},
+                        n::Int64, m::Int64) where T
    D, K = Hypergraph_kernel(edges, vals, n, m)
    return StubHypergraph(vals, n, m, D, K, edges)
 end
 
-StubHypergraph(edges::Vector{Vector{Float64}}, n::Int64, m::Int64) = StubHypergraph(edges, ones(m), n, m)
+StubHypergraph(edges::Vector{Vector{Float64}}, n::Int64, m::Int64) = StubHypergraph(edges, ones(n), n, m)
+
+"""
+`remove!`
+=========
+
+Functions
+---------
+   - remove!(h, n): Delete node n from a hypergraph
+   - remove!(h, e): Delete edge h from a hypergraph
+
+"""
+function remove!(h::Hypergraphs, n::Int64)
+   h.edges = [filter!((x -> Int(floor(x)) == n), e) for e in h.edges]
+   setdiff!(h.edges, [[]]) # Remove empty nodes
+   h.n -= h.D[n]
+   h.m = size(h.edges,1)
+end
+
+function remove!(h::Hyptergraphs, e::Int64)
+   deleteat!(h.edges, e)
+   h.m -= 1
+end
+
+# Realign degree and edge sequences, as well as node names above n? To compensate for deletion
