@@ -1,12 +1,15 @@
 include("Hypergraphs.jl")
-using Combinatorics
+"""
+The models in this file come from Chodrow (2019) "Configuration Models of Random Hypergraphs". https://arxiv.org/abs/1902.09302
+Any occurrence of 'pp. X' indicates that a bit of code is inspired by material on page X of the paper.
+"""
 
 """
 `stub_matching`
 ===============
 
 Produce a random (likely degenerate) hypergraph with given degree and edge
-dimension sequences via stub matching.
+dimension sequences via stub matching. pp. 2, 6
 
 Arguments
 ---------
@@ -22,23 +25,23 @@ stub_matching([1], [2], ["foo"])
 ~~~~
 """
 function stub_matching(D::Vector{Int64}, K::Vector{Int64}; vals=ones(size(D,1)))
-   hypergraph = StubHypergraph(Vector{Vector{Float64}}(), 0, 0)
+   hypergraph = StubHypergraph(Vector{Vector{Float64}}(), 0, 0) # Blank hypergraph
    stubs::Vector{Vector{Float64}} = [[i+(1/(n+1)) for n = 1:D[i]] for i = 1:size(D,1)]
-   for k = 1:size(K,1)
-      edge = zeros(K[k])
-      for d = 1:K[k]
-         node = rand(stubs)
+   for k = 1:size(K,1) # Iterate over edge dimension sequence
+      edge = zeros(K[k]) # Empty edge of length K[k]
+      for d = 1:K[k] # Choose K[k] random stubs for the edge
+         node = rand(stubs) # Node to get the stub from
          stub = rand(node)
          edge[d] = stub
-         setdiff!(node, [stub])
+         setdiff!(node, [stub]) # Remove stub
          if isempty(node)
             setdiff!(stubs, [node])
          end
       end
       push!(hypergraph.edges, edge)
    end
-   hypergraph.n = size(D, 1)
-   hypergraph.m = size(K, 1)
+   hypergraph.n = size(D,1) # Set hypergraph fields
+   hypergraph.m = size(K,1)
    hypergraph.D = D
    hypergraph.K = K
    hypergraph.vals = vals
@@ -49,9 +52,11 @@ end
 `pairwise_reshuffle!`
 =====================
 
-Performs a pairwise reshuffle on the edges numbered `e1` and `e2`. A pairwise
-shuffle is an operation that randomly swaps nodes between two edges while
-leaving their intersection untouched.
+Performs a pairwise reshuffle on the edges numbered `e1` and `e2`. 
+
+A pairwise shuffle is an operation that randomly swaps nodes between 
+two edges while leaving their intersection intact. Stubs within the
+intersection may be exchanged. pp. 6, 7
 """
 function pairwise_reshuffle!(h::Hypergraphs, e1::Int64, e2::Int64)
    @assert 0 < e1 <= h.m && 0 < e2 <= h.m # Edges to be reshuffled are valid
@@ -103,25 +108,51 @@ function pairwise_reshuffle_s!(h::StubHypergraph, e1::Int64, e2::Int64)
    h.edges[e2] = [h.edges[e2]; exclu]
 end
 
-# n choose k
-C(n,k) = factorial(n) / (factorial(k) * factorial(n-k))
+"""
+`probability`
+=============
 
+Get the probability that a pairwise reshuffle between `e1` and `e2` occurs. pp. 7, 8
+"""
 function probability(h::Hypergraphs, e1::Int64, e2::Int64)
+   C(n,k) = factorial(n) / (factorial(k) * factorial(n-k)) # n choose k
+
    intersect_size = length(edge_intersect(h, e1, e2))
-   pstub_realization = 1/((2 ^ intersect_size) * C(h.K[e1] + h.K[e2] - 2*intersect_size, h.K[e1] - intersect_size))
-   overall_stub = pstub_realization/C(h.m, 2)
+   pstub_realization = 1/((2 ^ intersect_size) * C(h.K[e1] + h.K[e2] - 2*intersect_size, h.K[e1] - intersect_size)) # (2), pp. 7
+   overall_stub = pstub_realization/C(h.m, 2) # (3), pp. 7
    if typeof(h) <: StubHypergraph
       return overall_stub
    else
-      return (overall_stub * 2^intersect_size) / (num_parallel(e1)*num_parallel(e2))
+      return (overall_stub * 2^intersect_size) / (num_parallel(e1)*num_parallel(e2)) # Statement of Theorem 2
    end
 end
 
-function MCMC(initial::Hypergraphs, interval::Int64, sz::Int64) 
-   current = initial
-   for t = 1:interval*sz
-      sample_edges = random_edge_indices(current, 2)
-      if rand(Float64) <= probability(current, sample_edges[1], sample_edges[2])
+"""
+`MCMC`
+======
+
+Randomly explore the space of hypergraphs (vertex- or stub-labeled) with the degree
+and edge-dimension sequences of a given graph via random pairwise shuffling. pp. 7-9
+
+Arguments
+---------
+   - `intiial::Hypergraphs`: The hypergraph from which exploration begins
+   - `h::Int64`: The number of (maximum) shuffles to perform in a sample
+   - `s::Int64`: The number of samples to take
+
+Example
+--------
+~~~~
+MCMC(G, 40, 50)
+~~~~
+"""
+function MCMC(initial::Hypergraphs, h::Int64, s::Int64) 
+   @assert h > 0 && s > 0 # Sample parameters are positive
+
+   current = copy(initial)
+   for t = 1:s*h
+      sample_edges = random_edge_indices(current, 2) # Random pair of edges
+      if rand(Float64) <= probability(current, sample_edges[1], sample_edges[2]) # Randomly decide whether to shuffle
          pairwise_reshuffle!(current, sample_edges[1], sample_edges[2])
       end
    end
