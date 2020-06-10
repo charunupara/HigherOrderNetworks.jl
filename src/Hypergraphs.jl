@@ -4,6 +4,7 @@ abstract type Hypergraphs end
 `VertexHypergraph{T}`
 =====================
 Represents a vertex-labeled hypergraph as a list of edges.
+
 Fields
 ------
    - `vals::Vector{T}`: The values corresponding to each node
@@ -25,7 +26,9 @@ end
 """
 `StubHypergraph{T}`
 ===================
+
 Represents a stub-labeled hypergraph as a list of edges.
+
 Fields
 ------
    - `vals::Vector{T}`: The values corresponding to each node
@@ -49,11 +52,13 @@ end
 """
 `Hypergraph_kernel`
 ===================
+
 Verifies that:
    - The number of nodes == `m`
    - The number of vals == `n`
    - All nodes are between 0 and `n`
    - If StubHypergraph, that all stub numberings are valid and none are skipped
+
 If all conditions are met, returns degree and edge dimension sequences
 """
 function Hypergraph_kernel(edges::Vector{Vector{Te}}, vals::Vector{T},
@@ -77,12 +82,15 @@ function Hypergraph_kernel(edges::Vector{Vector{Te}}, vals::Vector{T},
 end
 
 """
-VertexHypergraph constructors.
+VertexHypergraph constructors
+=============================
+
 Functions
 ---------
-   - VertexHypergraph(edges, vals, n, m): Produces a vertex-labeled hypergraph with the given edge set, values, and size
-   - VertexHypergraph(edges, n, m): Produces a vertex-labeled hypergraph with the given edge set and size, with all values as 1.0
-   - VertexHypergraph(s): Converts a stub-labeled hypergraph into a vertex-labeled hypergraph
+   - `VertexHypergraph(edges, vals, n, m)`: Produces a vertex-labeled hypergraph with the given edge set, values, and size
+   - `VertexHypergraph(edges, n, m)`: Produces a vertex-labeled hypergraph with the given edge set and size, with all values as 1.0
+   - `VertexHypergraph(s)`: Converts a stub-labeled hypergraph into a vertex-labeled hypergraph
+
 Examples
 --------
 ~~~~
@@ -101,11 +109,14 @@ VertexHypergraph(edges::Vector{Vector{Int64}}, n::Int64, m::Int64) = VertexHyper
 VertexHypergraph(s::StubHypergraph) = VertexHypergraph([Int64.(floor.(s.edges[i])) for i = 1:s.m], s.vals, s.n, s.m)
 
 """
-StubHypergraph constructors.
+StubHypergraph constructors
+===========================
+
 Functions
 ---------
-   - StubHypergraph(edges, vals, n, m): Produces a stub-labeled hypergraph with the given edge set, values, and size
-   - StubHypergraph(edges, n, m): Produces a stub-labeled hypergraph with the given edge set and size, with all values as 1.0
+   - `StubHypergraph(edges, vals, n, m)`: Produces a stub-labeled hypergraph with the given edge set, values, and size
+   - `StubHypergraph(edges, n, m)`: Produces a stub-labeled hypergraph with the given edge set and size, with all values as 1.0
+
 Examples
 --------
 ~~~~
@@ -127,9 +138,8 @@ StubHypergraph(edges::Vector{Vector{Float64}}, n::Int64, m::Int64) = StubHypergr
 
 Functions
 ---------
-   - remove!(h, n): Delete node n from a hypergraph
-   - remove!(h, e): Delete edge h from a hypergraph
-
+   - `remove!(h, n)`: Delete the node at index n from a hypergraph
+   - `remove!(h, e)`: Delete the edge at index e from a hypergraph
 """
 function remove!(h::Hypergraphs, n::Int64)
    for i = 1:m
