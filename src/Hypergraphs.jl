@@ -62,15 +62,16 @@ function Hypergraph_kernel(edges::Vector{Vector{Te}}, vals::Vector{T},
    @assert size(vals, 1) == n # Each node has a val associated with it
    @assert all([0 < edges[i][j] < n + 1 for i = 1:m for j = 1:size(edges[i], 1)]) # No node exceeds n
 
+   count(v, e) = sum([i == e ? 1 : 0 for k = 1:m for i in Int.(floor.(v[k]))])
+
    if Te == Float64
       possible_stubs = [i + 1/(j+1) for i = 1:n for j = 1:count(edges, i)]
       @assert all([i in possible_stubs for k = 1:m for i in edges[k]]) # Valid stub numberings
    end
 
-   count(v, e) = sum([i == e ? 1 : 0 for k = 1:m for i in v[k]])
-
    D::Vector{Int64} = [count(edges, v) for v = 1:n]
    K::Vector{Int64} = [size(edges[e], 1) for e = 1:m]
+   edges = map(sort!, edges) # Sort edge multisets
 
    return D, K
 end
@@ -131,15 +132,105 @@ Functions
 
 """
 function remove!(h::Hypergraphs, n::Int64)
-   h.edges = [filter!((x -> Int(floor(x)) == n), e) for e in h.edges]
-   setdiff!(h.edges, [[]]) # Remove empty nodes
-   h.n -= h.D[n]
+   for i = 1:m
+      filter!(x -> Int(floor(x)) == n, h.edges[i]) # Remove from edge
+      map!(x -> x > n ? x - 1 : x, h.edges[i]) # Adjust node identities
+      if h.edges[i] == [] # Clear empty edges
+         deleteat!(h.edges, i)
+         deleteat!(h.K, i)
+      end
+      h.K[i] -= count(x -> x == n, Int.(floor.(h.edges[i]))) # Edit edge dimension sequence
+   end
+
+   deleteat!(h.D, n) # Remove from degree sequence
+   
+   h.n -= 1
    h.m = size(h.edges,1)
 end
 
-function remove!(h::Hyptergraphs, e::Int64)
-   deleteat!(h.edges, e)
+function remove!(h::Hypergraphs, e::Int64)
+   for n in h.edges[e]
+      h.D[Int(floor(n))] -= 1 # Edit degree sequence
+   deleteat!(h.edges, e) # Remove edge
    h.m -= 1
 end
 
-# Realign degree and edge sequences, as well as node names above n? To compensate for deletion
+"""
+`edge_intersect`
+================
+
+Get the set of intersection between two hyperdges. Returns a set of integers.
+
+Arguments
+---------
+   - `h::Hypergraphs`: The hypergraph where the edges live
+   - `e1::Int64`: The index of the first edge
+   - `e2::Int64`: The index of the second edge
+
+Examples
+--------
+~~~~
+edge_intersect(VertexHypergraph([[1,3,5], [2,3,5], [3,5]], 1, 2)) -> {3, 5}
+edge_intersect(StubHypergraph([[1.5,3.33333333], [2.5,4.5,5.5], [3.5,5.33333333]], 1, 3)) -> {3}
+~~~~
+"""
+edge_intersect(h::Hypergraphs, e1::Int64, e2::Int64) = Set(filter(x -> x in Int.(floor.(h.edges[e2])), Int.(floor.(h.edges[e1]))))
+
+"""
+`num_parallel`
+==============
+
+Get the number of hyperedges parallel (multiset equal) to a given edge.
+
+Arguments
+---------
+   - `h::Hypergraphs`: The hypergraph to be analyzed
+   - `e::Int64`: The index of the edge
+"""
+num_parallel(h::Hypergraphs, e::Int64) = count(x -> Int.(floor.(x)) == Int.(floor.(h[e])), h.edges)
+
+"""
+`random_edges`
+==============
+
+Select `n` distinct random edges from a hypergraph.
+
+Example
+========
+~~~~
+random_edges(G, 3) -> [[e1], [e2], [e3]]
+~~~~
+"""
+function random_edges(h::Hypergraphs, n::Int64)
+   @assert 0 < n <= h.m # The number to be sampled is valid
+
+   edges_copy = copy(h.edges)
+   for i = 1:h.m - n
+      deleteat!(edges_copy, rand(1:size(edges_copy,1)))
+   end
+
+   return edges_copy
+end
+
+"""
+`random_edges`
+==============
+
+Select `n` distinct random edge indices from a hypergraph.
+
+Example
+========
+~~~~
+random_edge_indices(G, 3) -> [e1, e2, e3]
+~~~~
+"""
+function random_edge_indices(h::Hypergraphs, n::Int64)
+   @assert 0 < n <= h.m
+
+   indices = [i for i = 1:h.m]
+   for i = 1:h.m - n
+      deleteat!(indices, rand(1:size(indices,1)))
+   end
+
+   return indices
+end
