@@ -1,4 +1,5 @@
 include("Hypergraphs.jl")
+using Combinatorics
 
 """
 `stub_matching`
@@ -63,7 +64,7 @@ function pairwise_reshuffle!(h::Hypergraphs, e1::Int64, e2::Int64)
 end
 
 function pairwise_reshuffle_v!(h::VertexHypergraph, e1::Int64, e2::Int64)
-   inter = filter(x -> x in h.edges[e2], h.edges[e1]) # edge1 ⋂ edge2
+   inter = collect(edge_intersect(h, e1, e2)) # edge1 ⋂ edge2
    exclu = setdiff([h.edges[e1]; h.edges[e2]], inter) # (edge1 ⋃ edge2) \ inter
 
    h.edges[e1] = copy(inter) # Initialize e1 as intersection
@@ -78,10 +79,20 @@ function pairwise_reshuffle_v!(h::VertexHypergraph, e1::Int64, e2::Int64)
 end
 
 function pairwise_reshuffle_s!(h::StubHypergraph, e1::Int64, e2::Int64)
-   inter = Set(filter(x -> x in Int.(floor.(h.edges[e2])), Int.(floor.(h.edges[e1])))) # Get the set of intersection nodes
+   inter = edge_intersect(h, e1, e2) # Get the set of intersection nodes
    exclu = filter(x -> !(Int(floor(x)) in inter), [h.edges[e1]; h.edges[e2]]) # Get stubs that are not in intersection
    filter!(x -> Int(floor(x)) in inter, h.edges[e1]) # Set e1 and e2 to only the stubs that are in the intersection
    filter!(x -> Int(floor(x)) in inter, h.edges[e2])
+   sort!(h.edges[e1])
+   sort!(h.edges[e2])
+
+   for i = 1:length(inter) # Shuffle intersection stubs
+      if rand(Float64) < 0.5
+         temp = h.edges[e1][i]
+         h.edges[e1][i] = h.edges[e2][i]
+         h.edges[e2][i] = temp
+      end
+   end
 
    for i = 1:h.K[e1] - length(inter)
       new_n = rand(exclu)
@@ -92,8 +103,32 @@ function pairwise_reshuffle_s!(h::StubHypergraph, e1::Int64, e2::Int64)
    h.edges[e2] = [h.edges[e2]; exclu]
 end
 
-#=g = StubHypergraph([[1.5,2.5],[2.33333333,3.5],[1.33333333,4.5]], 4, 3)
-println(g)
-pairwise_reshuffle_s!(g, 1, 3)
-println(g)
-println()=#
+# n choose k
+C(n,k) = factorial(n) / (factorial(k) * factorial(n-k))
+
+function probability(h::Hypergraphs, e1::Int64, e2::Int64)
+   intersect_size = length(edge_intersect(h, e1, e2))
+   pstub_realization = 1/((2 ^ intersect_size) * C(h.K[e1] + h.K[e2] - 2*intersect_size, h.K[e1] - intersect_size))
+   overall_stub = pstub_realization/C(h.m, 2)
+   if typeof(h) <: StubHypergraph
+      return overall_stub
+   else
+      return (overall_stub * 2^intersect_size) / (num_parallel(e1)*num_parallel(e2))
+   end
+end
+
+function MCMC(initial::Hypergraphs, interval::Int64, sz::Int64) 
+   current = initial
+   for t = 1:interval*sz
+      sample_edges = random_edge_indices(current, 2)
+      if rand(Float64) <= probability(current, sample_edges[1], sample_edges[2])
+         pairwise_reshuffle!(current, sample_edges[1], sample_edges[2])
+      end
+   end
+   return current
+end
+
+#=g = StubHypergraph([[1.5,2.5],[7/3,3.5],[4/3,4.5]], 4, 3)
+print(g)
+MCMC(g, 10, 10)
+print(g)=#
