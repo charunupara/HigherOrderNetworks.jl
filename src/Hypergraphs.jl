@@ -109,8 +109,29 @@ function VertexHypergraph(edges::Vector{Vector{Int64}}, vals::Vector{T},
    return VertexHypergraph(vals, n, m, D, K, edges)
 end
 
-VertexHypergraph(edges::Vector{Vector{Int64}}, n::Int64, m::Int64) = VertexHypergraph(edges, ones(n), n, m)
-VertexHypergraph(s::StubHypergraph) = VertexHypergraph([vertex_floor.(s.edges[i]) for i = 1:s.m], s.vals, s.n, s.m)
+function VertexHypergraph(edges::Vector{Vector{Int64}}, n::Int64, m::Int64) 
+   return VertexHypergraph(edges, ones(n), n, m)
+end
+
+function VertexHypergraph(edges::Vector{Vector{Int64}})
+   return VertexHypergraph(edges, maximum([e[i] for e in edges for i = 1:size(e,1)]), size(edges,1))
+end
+
+function VertexHypergraph(filepath::String)
+   try
+      open(filepath) do file
+         lines = [ln for ln in eachline(file)]
+         edges = [map(x -> parse(Int64, x), split(ln, " ")) for ln in lines]
+         return VertexHypergraph(edges)
+      end
+   catch ex
+      print("Something bad happened!")
+   end
+end
+
+function VertexHypergraph(s::StubHypergraph)
+   return VertexHypergraph([vertex_floor.(s.edges[i]) for i = 1:s.m], s.vals, s.n, s.m)
+end
 
 """
 StubHypergraph constructors
@@ -134,18 +155,41 @@ function StubHypergraph(edges::Vector{Vector{Float64}}, vals::Vector{T},
    return StubHypergraph(vals, n, m, D, K, edges)
 end
 
-StubHypergraph(edges::Vector{Vector{Float64}}, n::Int64, m::Int64) = StubHypergraph(edges, ones(n), n, m)
+function StubHypergraph(edges::Vector{Vector{Float64}}, n::Int64, m::Int64)
+   return StubHypergraph(edges, ones(n), n, m)
+end
+
+Base.copy(h::VertexHypergraph) = VertexHypergraph(h.edges, h.vals, h.n, h.m) 
+Base.copy(h::StubHypergraph) = StubHypergraph(h.edges, h.vals, h.n, h.m) 
 
 """
-`remove!`
-=========
+`add_node!`
+===========
 
-Functions
----------
-   - `remove!(h, n)`: Delete the node at index n from a hypergraph
-   - `remove!(h, e)`: Delete the edge at index e from a hypergraph
+Add a node to the hypergraph.
 """
-function remove!(h::Hypergraphs, n::Int64)
+function add_node!(h::Hypergraphs)
+   #if typeof(h) <: VertexHypergraph
+
+end
+
+"""
+`sorted_nodes`
+==============
+
+Return the node list sorted by node degree.
+"""
+function sorted_nodes(h::Hypergraphs)
+   return sort(collect(1:h.n), by=x -> h.D[x], rev=true)
+end
+
+"""
+`remove_node!`
+==============
+
+Delete the node at index `n` from a hypergraph. 
+"""
+function remove_node!(h::Hypergraphs, n::Int64)
    for i = 1:m
       filter!(x -> vertex_floor(x) == n, h.edges[i]) # Remove from edge
       map!(x -> x > n ? x - 1 : x, h.edges[i]) # Adjust node identities
@@ -162,7 +206,13 @@ function remove!(h::Hypergraphs, n::Int64)
    h.m = size(h.edges,1)
 end
 
-function remove!(h::Hypergraphs, e::Int64)
+"""
+`remove_edge!`
+==============
+
+Delete the edge at index `e` from a hypergraph. 
+"""
+function remove_edge!(h::Hypergraphs, e::Int64)
    for n in h.edges[e]
       h.D[vertex_floor(n)] -= 1 # Edit degree sequence
    end
@@ -189,7 +239,9 @@ edge_intersect(VertexHypergraph([[1,3,5], [2,3,5], [3,5]], 1, 2)) -> {3, 5}
 edge_intersect(StubHypergraph([[1.5,3.33333333], [2.5,4.5,5.5], [3.5,5.33333333]], 1, 3)) -> {3}
 ~~~~
 """
-edge_intersect(h::Hypergraphs, e1::Int64, e2::Int64) = Set(filter(x -> x in vertex_floor.(h.edges[e2]), vertex_floor.(h.edges[e1])))
+function edge_intersect(h::Hypergraphs, e1::Int64, e2::Int64)
+   return Set(filter(x -> x in vertex_floor.(h.edges[e2]), vertex_floor.(h.edges[e1])))
+end
 
 """
 `num_parallel`
@@ -202,7 +254,9 @@ Arguments
    - `h::Hypergraphs`: The hypergraph to be analyzed
    - `e::Int64`: The index of the edge
 """
-num_parallel(h::Hypergraphs, e::Int64) = count(x -> vertex_floor.(x) == vertex_floor.(h[e]), h.edges)
+function num_parallel(h::Hypergraphs, e::Int64)
+   return count(x -> vertex_floor.(x) == vertex_floor.(h.edges[e]), h.edges)
+end
 
 """
 `random_edges`
