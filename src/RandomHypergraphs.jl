@@ -1,4 +1,5 @@
 include("Hypergraphs.jl")
+
 """
 The models in this file come from Chodrow (2019) "Configuration Models of Random Hypergraphs". https://arxiv.org/abs/1902.09302
 Any occurrence of 'pp. X' indicates that a bit of code is inspired by material on page X of the paper.

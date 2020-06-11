@@ -163,6 +163,7 @@ function remove!(h::Hypergraphs, e::Int64)
       h.D[Int(floor(n))] -= 1 # Edit degree sequence
    deleteat!(h.edges, e) # Remove edge
    h.m -= 1
+   end
 end
 
 """
