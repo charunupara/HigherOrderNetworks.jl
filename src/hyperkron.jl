@@ -1,24 +1,67 @@
-"""
-authors:
-David F. Gleich
-Arjun S. Ramani
-Nicole Eikmeier
-Charun Upara (update to Julia 1.4)
-Joshua Turner (update to Julia 1.4)
-"""
-
 using SparseArrays
 using LinearAlgebra
 using Random
-"""
-`kronecker_graph`
-=================
 
-Create an instance of a Kronecker graph using the grass-hopping algorithm.
-"""
-## Regions
 
-# Increment to the next region of a Kronecker graph
+""" 
+`hyperkron_graph`
+==================
+Code to generate a HyperKron Graph using the grass-hopping algorithm.
+
+The original code for this method can be found at:
+https://www.cs.purdue.edu/homes/dgleich/codes/hyperkron/
+
+The model definition can be found in the following paper:
+https://arxiv.org/abs/1809.03488
+
+
+Input
+-----
+- `K`: The initiator tensor
+- `k`: The power for the tensor
+- `motif`: optional parameter. You can define your own motif to add to the model. Default is undirected triangle.
+
+Functions
+---------
+-`hyperkron_graph(K,k)`
+-`hyperkron_graph(K,k;triangle,False)`
+
+Output
+------
+- A matrix network type for the hyperkron graph
+- A list of hyperedges
+
+Example
+--------
+A,hedges = hyperkron_graph(kron_params(0.99, 0.2, 0.3, 0.05), 5)
+hyperkron_graph(K,k; motif=:triangle, onlytris::Bool=false)
+ 
+The code calls "hypergraph_to_edges_with_" 'motif' in order
+to generate the graph to return. Consequently, you can implement
+your own motifs via this routine.
+"""
+function hyperkron_graph(K,k;
+    motif_to_graph::Function = hyperedges_to_graph_with_triangles, kwargs...)
+
+  hedges = fast_hyperkron_edges(K,k; kwargs...)
+  return motif_to_graph(size(K,1)^k, hedges), hedges
+end
+
+
+"""
+`_next_region!`
+===============
+Increment to the next region of a Kronecker graph
+
+Input
+-----
+-`cur`: The current region
+-`m`: The total number of elements in the initiated tensor (ie 8 for a 2x2x2 initiator tensor). 
+
+Output
+------
+Outputs the next region
+"""
 @inline function _next_region!(cur::AbstractArray{T,1}, m::Integer) where T <: Integer
   lastk = length(cur)
   for k=length(cur):-1:1
@@ -39,56 +82,37 @@ Create an instance of a Kronecker graph using the grass-hopping algorithm.
   cur
 end
 
-#=
-cur = [1,1,1,1]
-@show _next_region!(cur, 3)
-@show _next_region!(cur, 3)
-@show _next_region!(cur, 3)
-@show _next_region!(cur, 3)
-@show _next_region!(cur, 3)
-@time _next_region!(cur, 3)
+"""
+`_first_region`
+===============
+Gives the first region.
 
-
-cur = [1,1,1]
-@show _next_region!(cur, 4)
-while cur[1] != 0
-  @show _next_region!(cur, 4)
-end
-=#
-
-
+Input
+-----
+-`a`: The vectorized initiator tensor
+-`k`: The power of the HyperKron model
+Output
+------
+An array of all ones, representing the first region.
+"""
 function _first_region(a::AbstractArray,k::Integer)
   return ones(UInt32,k)
 end
 
-function _all_regions(a::AbstractArray,k::Integer)
-  # CU: no need to call this function here, can just call ones() directly?
-  cur = _first_region(a,k)
-  # CU: the type seems to be hard-coded, so I'm setting it to UInt32 to make things easier
-  rval = Array{UInt32}[]
-  while cur[1] != 0
-    push!(rval, copy(cur))
-    _next_region!(cur, 4)
-  end
-  return rval
-end
+"""
+`num_multiset_permutations`
+===========================
+Returns the number of multiset permutations of elements in the given array.
 
-@show R =_all_regions([0.99,0.5,0.5,0.2],3)
-@show typeof(R)
-@time _all_regions([0.99,0.5,0.5,0.2],3)
-@time _all_regions([0.99,0.5,0.5,0.2],4)
-@time _all_regions([0.99,0.5,0.5,0.2],5)
+Input
+-----
+-`ms`: A sorted array of numbers, which represent the values in the multiset.
+-`start_pos`: Default is 1. 
 
-
-
-# Unranking
-
-# unrank([1,2,2,4], 1) returns [1,2,2,4]
-# unrank([1,2,2,4], 2) returns [1,2,4,2]
-# unrank([0,1,1,3], 3) returns [1,4,2,2]
-
-# This assumes ms is sorted
-
+Output
+------
+The number of multiset permutations.
+"""
 function num_multiset_permutations(ms::AbstractArray{T,1}, start_pos::Integer = 1) where T<:Integer
   nperm = 1
   count = 1
@@ -108,8 +132,22 @@ function num_multiset_permutations(ms::AbstractArray{T,1}, start_pos::Integer = 
   nperm = div(nperm,countfac)
 end
 
-# Find the next distinct character after a[k]
-# Returns the index where it occurs or length(a)+1
+"""
+`_next_distinct_character`
+==========================
+Find the next distinct character after a[k]
+Returns the index where it occurs or length(a)+1
+
+Input
+-----
+-`a`: A region in the HyperKron tensor
+-`k`: The current character (between 1 and m)
+-`m`: Length of a. 
+
+Output
+------
+The index where the next character occurs. 
+"""
 @inline function _next_distinct_character(a, k::Integer, m::Integer)
   # check for easy out
   if k>=m
@@ -139,22 +177,26 @@ end
   end
 end
 
+"""
+`unrank5!`
+==========
+This version doesn't use recursion, and unranks the sorted set ms in place
+It also gets the multiplicity of each element to update nperm without
+recomputing it from scratch, it also can take in the total number
+of permutations and just update as we go.
+This version tries to avoid integer division by storing nperm as a float
 
-#=
-@show _next_distinct_character([5,6,6,6,8],2,4)
-@show _next_distinct_character([5,6,6,6,6,8],1,6)
-@show _next_distinct_character([5,6,6,6,6,8],6,6)-6
-=#
-# This version doesn't use recursion, and unranks the sorted set ms in place
-# It also gets the multiplicity of each element to update nperm without
-# recomputing it from scratch, it also can take in the total number
-# of permutations and just update as we go.
-#
-# This version doesn't use recursion, and unranks the sorted set ms in place
-# It also gets the multiplicity of each element to update nperm without
-# recomputing it from scratch, it also can take in the total number
-# of permutations and just update as we go.
-# This version tries to avoid integer division by storing nperm as a float
+Input
+-----
+-`ms`: Multiset	
+-`n`: Current rank
+-`nperm`: The number of multiset permutations of the region
+-`m`: Length of ms
+
+Output
+------
+Nothing, it modifies ms. 
+"""
 @inline function unrank5!(ms::AbstractArray{T,1}, n::Integer, nperm, m) where T<:Integer
   multcur = 0
   imultcur = 1.0
@@ -237,23 +279,26 @@ end
 end
 unrank5!(ms, n) = unrank5!(ms, n, num_multiset_permutations(ms), length(ms))
 
-@inline function mydivmod(val,n)
-  if n==2
-    d2 = val >> 1
-    d1 = val - d2*n
-  elseif n==4
-    d2 = val >> 2
-    d1 = val - d2*n
-  else
-    d1 = mod(val,n)
-    d2 = div(val,n)
-  end
-  return d2, d1
-end
-@show mydivmod(5,2), divrem(5,2)
 
+"""
+`_morton_decode3`
+=================
+Turns an index from a k-dimensional multiplication table into the corresponding index in the 3-dimensional tensor product.
 
+Input
+-----
+-`mind`: Length k (where k is the number of kronecker products to take) array of indices in the k-dimensional multiplication table
+-`n`: The side length of the initiator tensor
+-`sz`: The full size of the initiator tensor
 
+Output
+------
+Length 3 array, representing the corresponding indices in the tensor product. 
+
+Example
+-------
+_morton_decode3([8,8,8,8],2,(2,2,2))
+"""
 @inline function _morton_decode3(mind::AbstractArray{T,1}, n, sz) where T<:Integer
   row = 0
   col = 0
@@ -269,8 +314,6 @@ end
   end
   return (row+1, col+1, tub+1)
 end
-@show _morton_decode3([8,8,8,8],2,(2,2,2))
-#@time _morton_decode([4,4,4,4],2)
 
 
 #_randgeo(p) = ceil(Int,-randexp() / log1p(-p)) # jsut a copy of Distributions.jl
@@ -278,6 +321,29 @@ end
 #_randgeo_true(p) = ceil(Int,-randexp() / log1p(-p)) # jsut a copy of Distributions.jl
 #_randgeo(p) = _randgeo_true(max(0.01*p, p + 0.0*p*randn()))
 _randgeo(p) = ceil(Int,-randexp() / log1p(-p))
+
+"""
+`_generate_region!`
+==================
+Given a region of the tensor, do the grass-hopping procedure to generate hyperedges.
+
+Input
+-----
+-`ei`: First indices of hyperedges
+-`ej`: Second indices of hyperedges
+-`ek`: Third indices of hyperedges
+-`r`: Region 
+-`e`: Edge in Region
+-`p`: The probability of edges within this particular region.
+-`small_n`: The length of one dimension of the initiator matrix.
+-`sz`: The full dimensions of the initiator tensor.
+-`onlytris`: Boolean
+-`onlysym`: Boolean
+
+Output
+------
+Nothing, modifies input.
+"""
 function _generate_region!(
     ei::Array{Ta}, ej::Array{Ta}, ek::Array{Ta},
     r::AbstractArray{Tb,1},
@@ -316,9 +382,20 @@ function _generate_region!(
     end
 end
 
-# K = initial tensor
-# k = r in paper
-# The rest is optional
+"""
+`fast_hyperkron_edges`
+======================
+Returns the hyperedges of the Kronecker model
+
+Input
+-----
+-`K`: Initial tensor for hyperkron model
+-`k`: Power for the hyperkron model
+
+Output
+------
+ei,ej,ek: Three arrays which hold the indices for hyperedges
+"""
 function fast_hyperkron_edges(K,k;
   noise::Float64=0.0,onlytris::Bool=false,onlysym::Bool=true)
   n = size(K,1)
@@ -358,7 +435,22 @@ function fast_hyperkron_edges(K,k;
   return ei, ej, ek
 end
 
+"""
+`kron_params`
+=============
+Turn 4 parameters into a 2x2x2 symmetric tensor representation for the hyperkron_graph function
 
+Input
+-----
+-`a`: probability between 0 and 1
+-`b`: probability between 0 and 1
+-`c`: probability between 0 and 1
+-`d`: probability between 0 and 1
+
+Output
+Correctly formatted tensor parameters
+
+"""
 function kron_params(a,b,c,d)
   K = zeros(2,2,2)
   K[1,1,1] = a
@@ -368,7 +460,20 @@ function kron_params(a,b,c,d)
   return K
 end
 
-##
+"""
+`hyperedges_to_graph_with_triangles`
+====================================
+Turns a set of hyperedges into a graph.
+
+Input
+-----
+-`n`: The size of the graph
+-`hedges`: The hyperedges
+
+Output
+------
+A MatrixNetwork graph based on the given hyperedges.
+"""
 function hyperedges_to_graph_with_triangles(n::Int, hedges)
   ei = zeros(Int64,0)
   ej = zeros(Int64,0)
@@ -384,19 +489,3 @@ function hyperedges_to_graph_with_triangles(n::Int, hedges)
   return A
 end
 
-##
-""" Generate a HyperKron Graph.
-
-    hyperkron_graph(K,k)
-    hyperkron_graph(K,k; motif=:triangle, onlytris::Bool=false)
-
-The code calls "hypergraph_to_edges_with_" 'motif' in order
-to generate the graph to return. Consequently, you can implement
-your own motifs via this routine.
-"""
-function hyperkron_graph(K,k;
-    motif_to_graph::Function = hyperedges_to_graph_with_triangles, kwargs...)
-
-  hedges = fast_hyperkron_edges(K,k; kwargs...)
-  return motif_to_graph(size(K,1)^k, hedges), hedges
-end
