@@ -78,8 +78,14 @@ function Hypergraph_kernel(edges::Vector{Vector{Te}}, vals::Vector{T},
       @assert all([i in possible_stubs for k = 1:m for i in edges[k]]) # Valid stub numberings
    end
 
-   D::Vector{Int64} = [count(edges, v) for v = 1:n]
-   K::Vector{Int64} = [size(edges[e], 1) for e = 1:m]
+   D = Int.(zeros(n))
+   K = Int.(zeros(m))
+   for e = 1:m
+      K[e] = size(edges[e],1)
+      for v in edges[e]
+         D[vertex_floor(v)] += 1
+      end
+   end
    edges = map(sort!, edges) # Sort edge multisets
 
    return D, K
@@ -159,8 +165,8 @@ function StubHypergraph(edges::Vector{Vector{Float64}}, n::Int64, m::Int64)
    return StubHypergraph(edges, ones(n), n, m)
 end
 
-Base.copy(h::VertexHypergraph) = VertexHypergraph(h.edges, h.vals, h.n, h.m) 
-Base.copy(h::StubHypergraph) = StubHypergraph(h.edges, h.vals, h.n, h.m) 
+Base.copy(h::VertexHypergraph) = VertexHypergraph(copy(h.edges), copy(h.vals), h.n, h.m) 
+Base.copy(h::StubHypergraph) = StubHypergraph(copy(h.edges), copy(h.vals), h.n, h.m) 
 
 """
 `add_node!`
@@ -240,7 +246,8 @@ edge_intersect(StubHypergraph([[1.5,3.33333333], [2.5,4.5,5.5], [3.5,5.33333333]
 ~~~~
 """
 function edge_intersect(h::Hypergraphs, e1::Int64, e2::Int64)
-   return Set(filter(x -> x in vertex_floor.(h.edges[e2]), vertex_floor.(h.edges[e1])))
+   e1f, e2f = vertex_floor.(h.edges[e1]), vertex_floor.(h.edges[e2])
+   return Set(filter(x -> x in e2f, e1f))
 end
 
 """
@@ -300,7 +307,6 @@ function random_edge_indices(h::Hypergraphs, n::Int64)
    for i = 1:h.m - n
       deleteat!(indices, rand(1:size(indices,1)))
    end
-
    return indices
 end
 

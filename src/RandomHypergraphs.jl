@@ -52,9 +52,9 @@ end
 `pairwise_reshuffle!`
 =====================
 
-Performs a pairwise reshuffle on the edges numbered `e1` and `e2`. 
+Performs a pairwise reshuffle on the edges numbered `e1` and `e2`.
 
-A pairwise shuffle is an operation that randomly swaps nodes between 
+A pairwise shuffle is an operation that randomly swaps nodes between
 two edges while leaving their intersection intact. Stubs within the
 intersection may be exchanged. pp. 6, 7
 """
@@ -68,6 +68,12 @@ function pairwise_reshuffle!(h::Hypergraphs, e1::Int64, e2::Int64)
    end
 end
 
+"""
+`pairwise_reshuffle_v!`
+=======================
+
+Perform a pairwise reshuffle on edges at indices `e1` and `e2` in a vertex-labeled hypergraph.
+"""
 function pairwise_reshuffle_v!(h::VertexHypergraph, e1::Int64, e2::Int64)
    inter = collect(edge_intersect(h, e1, e2)) # edge1 ⋂ edge2
    exclu = setdiff([h.edges[e1]; h.edges[e2]], inter) # (edge1 ⋃ edge2) \ inter
@@ -83,16 +89,22 @@ function pairwise_reshuffle_v!(h::VertexHypergraph, e1::Int64, e2::Int64)
    h.edges[e2] = [inter; exclu] # Assign the rest to e2
 end
 
+"""
+`pairwise_reshuffle_s!`
+=======================
+
+Perform a pairwise reshuffle on edges at indices `e1` and `e2` in a stub-labeled hypergraph.
+"""
 function pairwise_reshuffle_s!(h::StubHypergraph, e1::Int64, e2::Int64)
    inter = edge_intersect(h, e1, e2) # Get the set of intersection nodes
    exclu = filter(x -> !(Int(floor(x)) in inter), [h.edges[e1]; h.edges[e2]]) # Get stubs that are not in intersection
-   filter!(x -> Int(floor(x)) in inter, h.edges[e1]) # Set e1 and e2 to only the stubs that are in the intersection
-   filter!(x -> Int(floor(x)) in inter, h.edges[e2])
+   filter!(x -> vertex_floor(x) in inter, h.edges[e1]) # Set e1 and e2 to only the stubs that are in the intersection
+   filter!(x -> vertex_floor(x) in inter, h.edges[e2])
    sort!(h.edges[e1])
    sort!(h.edges[e2])
 
    for i = 1:length(inter) # Shuffle intersection stubs
-      if rand(Float64) < 0.5
+      if rand(Float64) <= 0.5
          temp = h.edges[e1][i]
          h.edges[e1][i] = h.edges[e2][i]
          h.edges[e2][i] = temp
@@ -115,15 +127,13 @@ end
 Get the probability that a pairwise reshuffle between `e1` and `e2` occurs. pp. 7, 8
 """
 function probability(h::Hypergraphs, e1::Int64, e2::Int64)
-   C(n,k) = factorial(n) / (factorial(k) * factorial(n-k)) # n choose k
-
    intersect_size = length(edge_intersect(h, e1, e2))
    pstub_realization = 1/((2 ^ intersect_size) * C(h.K[e1] + h.K[e2] - 2*intersect_size, h.K[e1] - intersect_size)) # (2), pp. 7
    overall_stub = pstub_realization/C(h.m, 2) # (3), pp. 7
    if typeof(h) <: StubHypergraph
       return overall_stub
    else
-      return (overall_stub * 2^intersect_size) / (num_parallel(e1)*num_parallel(e2)) # Statement of Theorem 2
+      return (overall_stub * 2^intersect_size) / (num_parallel(h, e1)*num_parallel(h, e2)) # Statement of Theorem 2
    end
 end
 
@@ -137,8 +147,7 @@ and edge-dimension sequences of a given graph via random pairwise shuffling. pp.
 Arguments
 ---------
    - `intiial::Hypergraphs`: The hypergraph from which exploration begins
-   - `h::Int64`: The number of (maximum) shuffles to perform in a sample
-   - `s::Int64`: The number of samples to take
+   - `samples(=1000)`: The number of iterations to run 
 
 Example
 --------
@@ -146,13 +155,13 @@ Example
 MCMC(G, 40, 50)
 ~~~~
 """
-function MCMC(initial::Hypergraphs, h::Int64, s::Int64) 
-   @assert h > 0 && s > 0 # Sample parameters are positive
+function MCMC(initial::Hypergraphs; samples=1000)
+   @assert samples > 0 # Samples are positive
 
    current = copy(initial)
-   for t = 1:s*h
-      sample_edges = random_edge_indices(current, 2) # Random pair of edges
-      if rand(Float64) <= probability(current, sample_edges[1], sample_edges[2]) # Randomly decide whether to shuffle
+   for t = 1:samples
+      if rand(Float64) <= 0.5#probability(current, sample_edges[1], sample_edges[2]) # Randomly decide whether to shuffle
+         sample_edges = random_edge_indices(current, 2) # Random pair of edges
          pairwise_reshuffle!(current, sample_edges[1], sample_edges[2])
       end
    end
