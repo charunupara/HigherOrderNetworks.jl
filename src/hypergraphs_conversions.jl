@@ -55,9 +55,9 @@ Arguments
 Examples
 ----------
 ~~~~
-hypergraph_to_matrixnetworks(VertexHypergraph([[1,2,3,4], [3,4,1], [1,4,5]], ["One", "Two", "Three", "Four", "Five"], 5, 3))
+hypergraph_to_matrixnetwork(VertexHypergraph([[1,2,3,4], [3,4,1], [1,4,5]], ["One", "Two", "Three", "Four", "Five"], 5, 3))
 ~~~~
 """
-function hypergraph_to_matrixnetworks(A::VertexHypergraph)
+function hypergraph_to_matrixnetwork(A::VertexHypergraph)
     return MatrixNetwork(sparse(to_adjacency_matrix(A)))
 end
