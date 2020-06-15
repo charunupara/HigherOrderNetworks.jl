@@ -295,9 +295,13 @@ class hypergraph:
         }
         
         n = 0
-        v = []
-        while True:
-            edge = self.C[np.random.randint(self.m)]
+        candidates = [x for x in self.C if len(x) >= 2]
+        if n_samples > len(candidates):
+            n_samples = len(candidates)
+        return [choice_functions[choice_function](e) for e in random.sample(candidates, n_samples)]
+        
+        '''while True:
+            edge = self.C[np.random.randint(self.m)] # with replacement
             if len(edge) < 2:
                 continue
             x = choice_functions[choice_function](edge)
@@ -305,7 +309,7 @@ class hypergraph:
             n+=1
             if n > n_samples:
                 break
-        return(v)
+        return(v)'''
             
     def assortativity(self, n_samples = 10, choice_function = 'uniform', method = 'pearson'):
         '''
@@ -317,9 +321,9 @@ class hypergraph:
         #print(arr)
         
         if method == 'spearman':
-            order = np.argsort(arr, axis = 0)
-            print(order)
-            arr = np.argsort(order, axis = 0)
+            #order = np.argsort(arr, axis = 0)
+            #print(order)
+            arr = np.argsort(np.argsort(arr, axis = 0), axis = 0)
         elif method == 'pearson':
             arr = arr - 1
         #print(arr)
@@ -398,11 +402,11 @@ def projected_graph(C, weighted = False, as_hyper = False, multi = True):
         return(hypergraph(G, n_nodes = len(C.nodes)))
 
 
-with open("email-enron.txt") as f:
+'''with open("email-enron.txt") as f:
     content = [[int(i) for i in l.replace("\n","").split(" ") if i != ""] for l in f.readlines()]
     h = hypergraph(content)
     #print([i+1 for i in sorted(h.nodes, key=lambda x: h.D[x], reverse=True)[0:54]])
     #h.stub_edge_MH()
     #print(h.rank(3))
-    print(h.assortativity(n_samples=h.m, method="spearman", choice_function="uniform"))
+    print(h.assortativity(n_samples=h.m, method="spearman", choice_function="uniform"))'''
    
