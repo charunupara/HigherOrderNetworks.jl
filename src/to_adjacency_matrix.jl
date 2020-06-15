@@ -8,11 +8,11 @@ using MatrixNetworks
 `to_adjacency_matrix`
 =====================
 
-Convert a VertexHyperA to an adjacency matrix
+Convert a VertexHypergraph to an adjacency matrix
 
 Arguments
 ----------
-    - `A::VertexHyperA : The VertexHyperA that will be converted into an adjacency matrix`
+    - `A::VertexHypergraph : The VertexHypergraph that will be converted into an adjacency matrix`
 
 Examples
 ----------
