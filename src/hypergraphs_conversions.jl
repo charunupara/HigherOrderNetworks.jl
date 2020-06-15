@@ -1,8 +1,8 @@
 include("Hypergraphs.jl")
 include("RandomHypergraphs.jl")
 using MatrixNetworks
+using SparseArrays
 
-# TODO: Convert to MatrixNetworks type
 
 """
 `to_adjacency_matrix`
@@ -17,7 +17,7 @@ Arguments
 Examples
 ----------
 ~~~~
-to_adjacency_matrix(VertexHyperA([[1,2,3,4], [3,4,1], [1,4,5]], ["One", "Two", "Three", "Four", "Five"], 5, 3))
+to_adjacency_matrix(VertexHypergraph([[1,2,3,4], [3,4,1], [1,4,5]], ["One", "Two", "Three", "Four", "Five"], 5, 3))
 ~~~~
 """
 function to_adjacency_matrix(A::VertexHypergraph)
@@ -41,3 +41,23 @@ function to_adjacency_matrix(A::VertexHypergraph)
 end
 
 
+
+"""
+`hypergraph_to_matrixnetworks`
+=====================
+
+Convert a VertexHypergraph to a MatrixNetwork
+
+Arguments
+----------
+    - `A::VertexHypergraph : The VertexHypergraph that will be converted into a MatrixNetwork`
+
+Examples
+----------
+~~~~
+hypergraph_to_matrixnetworks(VertexHypergraph([[1,2,3,4], [3,4,1], [1,4,5]], ["One", "Two", "Three", "Four", "Five"], 5, 3))
+~~~~
+"""
+function hypergraph_to_matrixnetworks(A::VertexHypergraph)
+    return MatrixNetwork(sparse(to_adjacency_matrix(A)))
+end
