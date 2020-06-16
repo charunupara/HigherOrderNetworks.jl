@@ -9,7 +9,7 @@ Any occurrence of 'pp. X' indicates that a bit of code is inspired by material o
 ===============
 
 Produce a random (likely degenerate) hypergraph with given degree and edge
-dimension sequences via stub matching. pp. 2, 6
+dimension sequences via stub matching. (pp. 2, 6)
 
 Arguments
 ---------
@@ -38,7 +38,7 @@ function stub_matching(D::Vector{Int64}, K::Vector{Int64}; vals=ones(size(D,1)))
             setdiff!(stubs, [node])
          end
       end
-      push!(hypergraph.edges, edge)
+      push!(hypergraph.edges, sort(edge, by=x -> D[x], rev=true))
    end
    hypergraph.n = size(D,1) # Set hypergraph fields
    hypergraph.m = size(K,1)
@@ -56,7 +56,7 @@ Performs a pairwise reshuffle on the edges numbered `e1` and `e2`.
 
 A pairwise shuffle is an operation that randomly swaps nodes between
 two edges while leaving their intersection intact. Stubs within the
-intersection may be exchanged. pp. 6, 7
+intersection may be exchanged. (pp. 6-7)
 """
 function pairwise_reshuffle!(h::Hypergraphs, e1::Int64, e2::Int64)
    @assert 0 < e1 <= h.m && 0 < e2 <= h.m # Edges to be reshuffled are valid
@@ -66,6 +66,9 @@ function pairwise_reshuffle!(h::Hypergraphs, e1::Int64, e2::Int64)
    else
       pairwise_reshuffle_s!(h, e1, e2)
    end
+
+   sort!(h.edges[e1], by=x -> h.D[x], rev=true)
+   sort!(h.edges[e2], by=x -> h.D[x], rev=true)
 end
 
 """
@@ -97,7 +100,7 @@ Perform a pairwise reshuffle on edges at indices `e1` and `e2` in a stub-labeled
 """
 function pairwise_reshuffle_s!(h::StubHypergraph, e1::Int64, e2::Int64)
    inter = edge_intersect(h, e1, e2) # Get the set of intersection nodes
-   exclu = filter(x -> !(Int(floor(x)) in inter), [h.edges[e1]; h.edges[e2]]) # Get stubs that are not in intersection
+   exclu = filter(x -> !(vertex_floor(x) in inter), [h.edges[e1]; h.edges[e2]]) # Get stubs that are not in intersection
    filter!(x -> vertex_floor(x) in inter, h.edges[e1]) # Set e1 and e2 to only the stubs that are in the intersection
    filter!(x -> vertex_floor(x) in inter, h.edges[e2])
    sort!(h.edges[e1])
@@ -124,7 +127,7 @@ end
 `probability`
 =============
 
-Get the probability that a pairwise reshuffle between `e1` and `e2` occurs. pp. 7, 8
+Get the probability that a pairwise reshuffle between `e1` and `e2` occurs. (pp. 7-8)
 """
 function probability(h::Hypergraphs, e1::Int64, e2::Int64)
    intersect_size = length(edge_intersect(h, e1, e2))
@@ -142,7 +145,7 @@ end
 ======
 
 Randomly explore the space of hypergraphs (vertex- or stub-labeled) with the degree
-and edge-dimension sequences of a given graph via random pairwise shuffling. pp. 7-9
+and edge-dimension sequences of a given graph via random pairwise shuffling. (pp. 7-9)
 
 Arguments
 ---------

@@ -86,7 +86,7 @@ function Hypergraph_kernel(edges::Vector{Vector{Te}}, vals::Vector{T},
          D[vertex_floor(v)] += 1
       end
    end
-   edges = map(sort!, edges) # Sort edge multisets
+   edges = map(x -> sort!(x, by=v -> D[v], rev=true), edges) # Sort edge multisets by descending node degree
 
    return D, K
 end
@@ -168,6 +168,7 @@ end
 Base.copy(h::VertexHypergraph) = VertexHypergraph(copy(h.edges), copy(h.vals), h.n, h.m) 
 Base.copy(h::StubHypergraph) = StubHypergraph(copy(h.edges), copy(h.vals), h.n, h.m) 
 
+
 """
 `add_node!`
 ===========
@@ -196,7 +197,7 @@ end
 Delete the node at index `n` from a hypergraph. 
 """
 function remove_node!(h::Hypergraphs, n::Int64)
-   for i = 1:m
+   for i = 1:h.m
       filter!(x -> vertex_floor(x) == n, h.edges[i]) # Remove from edge
       map!(x -> x > n ? x - 1 : x, h.edges[i]) # Adjust node identities
       if h.edges[i] == [] # Clear empty edges
