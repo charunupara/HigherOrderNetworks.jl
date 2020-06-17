@@ -42,7 +42,7 @@ function to_adjacency_matrix(h::Hypergraphs; simple::Bool=false)
 
     if simple # Remove self-loops
         for i = 1:h.n
-            adjacency_matrix[i][i] = 0
+            adjacency_matrix[i,i] = 0
         end
     end
 
