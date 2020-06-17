@@ -71,22 +71,20 @@ function Hypergraph_kernel(edges::Vector{Vector{Te}}, vals::Vector{T},
    @assert size(vals, 1) == n # Each node has a val associated with it
    @assert all([0 < edges[i][j] < n + 1 for i = 1:m for j = 1:size(edges[i], 1)]) # No node exceeds n
 
-   count(v, e) = sum([i == e ? 1 : 0 for k = 1:m for i in vertex_floor.(v[k])])
-
-   if Te == Float64
-      possible_stubs = [i + 1/(j+1) for i = 1:n for j = 1:count(edges, i)]
-      @assert all([i in possible_stubs for k = 1:m for i in edges[k]]) # Valid stub numberings
-   end
-
-   D = Int.(zeros(n))
-   K = Int.(zeros(m))
+   D = zeros(Int64, n)
+   K = zeros(Int64, m)
    for e = 1:m
       K[e] = size(edges[e],1)
       for v in edges[e]
          D[vertex_floor(v)] += 1
       end
    end
-   edges = map(x -> sort!(x, by=v -> D[v], rev=true), edges) # Sort edge multisets by descending node degree
+   edges = map(x -> sort!(x, by=v -> D[vertex_floor(v)], rev=true), edges) # Sort edge multisets by descending node degree
+
+   if Te == Float64
+      possible_stubs = [i + 1/(j+1) for i = 1:n for j = 1:D[i]]
+      @assert all([i in possible_stubs for k = 1:m for i in edges[k]]) # Valid stub numberings
+   end
 
    return D, K
 end
@@ -111,7 +109,7 @@ VertexHypergraph(StubMatching([3,2,2,2], [4,3,2]))
 """
 function VertexHypergraph(edges::Vector{Vector{Int64}}, vals::Vector{T},
                           n::Int64, m::Int64) where T
-   D, K = Hypergraph_kernel(edges, vals, n, m)
+   D, K= Hypergraph_kernel(edges, vals, n, m)
    return VertexHypergraph(vals, n, m, D, K, edges)
 end
 
@@ -247,8 +245,7 @@ edge_intersect(StubHypergraph([[1.5,3.33333333], [2.5,4.5,5.5], [3.5,5.33333333]
 ~~~~
 """
 function edge_intersect(h::Hypergraphs, e1::Int64, e2::Int64)
-   e1f, e2f = vertex_floor.(h.edges[e1]), vertex_floor.(h.edges[e2])
-   return Set(filter(x -> x in e2f, e1f))
+   return intersect(vertex_floor.(h.edges[e1]), vertex_floor.(h.edges[e2]))
 end
 
 """
