@@ -124,23 +124,6 @@ function pairwise_reshuffle_s!(h::StubHypergraph, e1::Int64, e2::Int64)
 end
 
 """
-`probability`
-=============
-
-Get the probability that a pairwise reshuffle between `e1` and `e2` occurs. (pp. 7-8)
-"""
-function probability(h::Hypergraphs, e1::Int64, e2::Int64)
-   intersect_size = length(edge_intersect(h, e1, e2))
-   pstub_realization = 1/((2 ^ intersect_size) * C(h.K[e1] + h.K[e2] - 2*intersect_size, h.K[e1] - intersect_size)) # (2), pp. 7
-   overall_stub = pstub_realization/C(h.m, 2) # (3), pp. 7
-   if typeof(h) <: StubHypergraph
-      return overall_stub
-   else
-      return (overall_stub * 2^intersect_size) / (num_parallel(h, e1)*num_parallel(h, e2)) # Statement of Theorem 2
-   end
-end
-
-"""
 `MCMC`
 ======
 
@@ -161,17 +144,98 @@ MCMC(G, 40, 50)
 function MCMC(initial::Hypergraphs; samples=1000)
    @assert samples > 0 # Samples are positive
 
-   current = copy(initial)
-   for t = 1:samples
-      if rand(Float64) <= 0.5#probability(current, sample_edges[1], sample_edges[2]) # Randomly decide whether to shuffle
-         sample_edges = random_edge_indices(current, 2) # Random pair of edges
-         pairwise_reshuffle!(current, sample_edges[1], sample_edges[2])
-      end
+   if typeof(initial) <: StubHypergraph
+      return MCMC_s(initial; samples=samples)
+   else
+      return MCMC_v(initial; samples=samples)
    end
-   return current
 end
 
-#=g = StubHypergraph([[1.5,2.5],[7/3,3.5],[4/3,4.5]], 4, 3)
-print(g)
-MCMC(g, 10, 10)
-print(g)=#
+function MCMC_s(initial::Hypergraphs; samples=1000)
+   c = copy(initial)
+   for t = 1:samples
+      sample_edges = random_edge_indices(c, 2) # Random pair of edges
+      pairwise_reshuffle_s!(c, sample_edges[1], sample_edges[2])
+   end
+   return c
+end
+
+function MCMC_v(initial::Hypergraphs; samples=1000)
+   k = 0 # Number of iterations performed
+   n_rejected = 0 # Number of iterations in which a swap was rejected
+
+   c = copy(initial)
+   parallels = Dict()
+   for i = 1:c.m
+      if !haskey(parallels, c.edges[i])
+         parallels[c.edges[i]] = 0
+      end
+      parallels[c.edges[i]] += 1
+   end
+
+   while k - n_rejected < samples # Number of performed swaps < desired
+      n_rand = 20000
+
+      n_ = 1
+      p_ = 1
+      inds = zeros(Int64, n_rand) # Random edge indices
+      for i = 0:2:n_rand-1
+         pair = sample(1:initial.m, 2, replace=false)
+         inds[i+1], inds[i+2] = pair[1], pair[2]
+      end
+      probs = rand(Float64, Int(n_rand / 2))
+
+      while true
+         if n_ >= n_rand / 2
+            n_ = 1
+            p_ = 1
+            inds = zeros(Int64, n_rand)
+            for i = 0:2:n_rand-1
+               pair = sample(1:initial.m, 2, replace=false)
+               inds[i+1], inds[i+2] = pair[1], pair[2]
+            end
+            probs = rand(Float64, n_rand)
+         end 
+
+         i, j = inds[n_], inds[n_+1]
+         ei, ej = c.edges[i], c.edges[j]
+         
+         n_ += 2
+         p_ += 1
+         inter = 2.0^-length(intersect(ei, ej))
+
+         if probs[p_] > inter / (parallels[ei] * parallels[ej]) # Randomly decide whether to shuffle
+            n_rejected += 1
+            k += 1
+         else
+            parallels[ei] -= 1
+            parallels[ej] -= 1
+            if parallels[ei] <= 0
+               delete!(parallels, ei)
+            end
+            if parallels[ej] <= 0
+               delete!(parallels, ej)
+            end
+
+            pairwise_reshuffle_v!(c, i, j)
+
+            new_ei = c.edges[i]
+            new_ej = c.edges[j]
+
+            if !haskey(parallels, new_ei)
+               parallels[new_ei] = 0
+            end
+            if !haskey(parallels, new_ej)
+               parallels[new_ej] = 0
+            end
+            parallels[new_ei] += 1
+            parallels[new_ej] += 1
+
+            k += 1
+            break
+         end
+      end
+   end
+
+   return c
+end
