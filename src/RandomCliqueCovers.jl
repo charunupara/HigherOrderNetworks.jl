@@ -23,8 +23,14 @@ Arguments
     - `c::Float64 (> -s)`: Controls the expected number of cliques each vertex is a part of. Larger value = less overlap
     - `N (=rand(Poisson(τ))`: The total number of cliques
 
+Examples
+--------
+~~~~
+random_clique_cover(10.,0.9,0.1;N=100) # 100-clique graph with ~10 nodes per clique with high degree skew and medium clique overlap
+random_clique_cover(50.,0.1,5.) # 10-clique graph with ~50 nodes per clique with more uniform degree distribution and high clique overlap
+~~~~
 """
-function random_clique_cover(a::Float64, s::Float64, c::Float64; N=rand(Poisson(2*pi)))
+function random_clique_cover(a::Float64, s::Float64, c::Float64; N=10)
     @assert a > 0
     @assert s >= 0 && s < 1
     @assert c > -s
@@ -35,7 +41,7 @@ function random_clique_cover(a::Float64, s::Float64, c::Float64; N=rand(Poisson(
         return (radical * (n+c+s)/(n+c+1)) ^ (n+c) # Derived from Stirling's approximation for gamma
     end
 
-    agammr = a*gamma(c+1) / gamma(c+s)
+    agammr = a*gamma(c+1) / gamma(c+s) # Constant term for new node creation
 
     cliques = [[i for i = 1:P(a)]] # Stores cliques
     clique_count = [1 for i = 1:size(cliques[1],1)] # Stores how many cliques each node is part of
@@ -63,10 +69,9 @@ function random_clique_cover(a::Float64, s::Float64, c::Float64; N=rand(Poisson(
     end
 
     mat = Z' * Z # Convert edge clique cover to corresponding adjacency matrix
-    for i = 1:size(mat,1)
-        mat[i,i] = 0
-    end
+    mat -= Diagonal(mat)
     mat = min.(mat, 1)
+
     return MatrixNetwork(sparse(mat))
 end
 
@@ -76,6 +81,7 @@ s = 0.9
 c = 0.1
 N = 100
 @time rcc = random_clique_cover(a,s,c;N=N)
+
 #graphplot(sparse(rcc), igraph_layout(sparse(rcc)))
 #plot(1:rcc.n, sort(deg_distr(rcc), rev=true))
 #boxplot([deg_distr(random_clique_cover(a,s,c;N=N)) for s in 0.:0.1:0.9])
