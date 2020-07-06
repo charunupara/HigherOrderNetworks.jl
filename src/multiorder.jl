@@ -1,7 +1,8 @@
-using GSL
 using MatrixNetworks
+using SparseArrays
+using StatsFuns
 """
-`k_model`
+`K_Model`
 =========
 
 Represents a graph model of order k as described in https://arxiv.org/pdf/1702.05499.pdf
@@ -15,6 +16,8 @@ struct K_Model
     k::Int64
     P::Dict{Vector{Int64}, Float64}
 end
+
+Base.copy(M::K_Model) = K_Model(M.k, M.P)
 
 """
 `k_model_k`
@@ -92,7 +95,9 @@ generate_paths([[2], [3,4], [1], [1]], 2)
 ~~~~
 """
 function generate_paths(AL::Vector{Vector{Int64}}, k::Int64)
-    if k == 1
+    if k == 0 # Return nodes
+        return collect(1:size(AL,1))
+    elseif k == 1
         return [[i, j] for i = 1:size(AL,1) for j in AL[i]] # Return edges
     else
         k_paths = Vector{Vector{Int64}}()
@@ -124,15 +129,15 @@ function optimal_multiorder(S::Vector{Vector{Int64}}, K::Int64)
 
     for p in S
         P[p] = 1.0
-        for k = 1:min(K,size(p,1)) # Multiply by probability in each layer
+        for k = 1:min(K,size(p,1)) # Multiply by probability in each layer. E.g., P(a,b,c) = P(a) * P(b|a) * P(c|a,b)
             P[p] *= models[k].P[p[1:k]]
         end
-        for i = K+1:size(p,1) # Multiply by M_K+1 probability to produce path
+        for i = K+1:size(p,1) # Multiply by M_K+1 probability to produce path. For paths longer than K
             P[p] *= models[K+1].P[p[i-K:i]]
         end
     end
 
-    return k_model(K, P)
+    return K_Model(K, P)
 end
 
 """
@@ -144,10 +149,11 @@ Computes the likelihood that a multi-order model `M_k` produces the observed pat
 Precondition: S ⊆ M_k.P.keys
 """
 function multiorder_likelihood(M_k::K_Model, S::Vector{Vector{Int64}})
-    @assert issubset(Set(S), Set(key(M_k.P)))
+    @assert issubset(Set(S), keys(M_k.P))
     l = 1.0
     for p in S
         l *= M_k.P[p] # Product of likelihood for each path
+    end
     return l
 end
 
@@ -160,38 +166,44 @@ Compute the path length `k` by which the observed paths are most aptly modeled
 Arguments
 ---------
     - `S::Vector{Vector{Int64}}`: The observed paths
+    - `A::MatrixNetwork`: The graph underlying `S`
     - `p::Float64 (=0.05)`: The significance threshold for `k`
 
 Returns
 -------
 The optimal value for k and the corresponding multi-order model of order k
 """
-function K_opt(S::Vector{Vector{Int64}}; p::Float64=0.05)
+function K_opt(S::Vector{Vector{Int64}}, A::MatrixNetwork; p::Float64=0.01)
     K_opt = 1
     M_k = optimal_multiorder(S, K_opt)
 
     function p_value(M_k::K_Model, M_K::K_Model, S::Vector{Vector{Int64}})
-        M_kl = multiorder_likelihood(M_k, S)
-        M_Kl = multiorder_likelihood(M_K, S)
-
-        function matrix_df(A::Vector{Float64,2}, k::Int64)
+        function matrix_df(A::Array{Bool,2}, k::Int64)
             Ak = A^k
-            return sum([Ak[i,j] for i = 1:size(A,1) for j = 1:size(A,2)]) - sum([1 for i = 1:size(A,1) if !all(x -> x == 0, A[i,:]))
+            return sum(Ak) - sum([1 for i = 1:size(Ak,1) if sum(Ak[i,:]) != 0])
         end
 
         function df(M::K_Model)
-            return (size(keys(M.P),1) - 1) + sum([matrix_df(MATRIX, k) for k = 1:M.K) #TODO: Figure out what MATRIX is
+            return (A.n - 1) + sum([matrix_df(Array(sparse(A)), k) for k = 1:M.k])
         end
 
-        return 1 - sf_gamma_inc((df(M_K)-df(M_k))/2, -log10(M_kl/M_Kl))
+        M_kl = multiorder_likelihood(M_k, S)
+        M_Kl = multiorder_likelihood(M_K, S)
+
+        #println("$M_Kl, $M_kl")
+
+        dfMk = df(M_k)
+        dfMK = df(M_K)
+        return 1 - chisqcdf(2log(M_Kl/M_kl), dfMK-dfMk)
     end
 
     while true
         M_K = optimal_multiorder(S, K_opt + 1)
+        #println(M_K.P == M_k.P)
         if p_value(M_k, M_K, S) < p
             break
         else
-            M_k = M_K
+            M_k = deepcopy(M_K)
             K_opt += 1
         end
     end
@@ -200,15 +212,17 @@ end
 
 
 AL = [[2], [4,3], [1], [1,2]]
-paths = Vector{Vector{Int64}}()
-for k = 1:3
+#=paths = Vector{Vector{Int64}}()
+
+for k = 1:5
     append!(paths, generate_paths(AL, k))
-end
-paths = generate_paths(AL, 4)
+end=#
 #=paths = [[2,4], [2,3], [4,1], [4,2], [1,2], [2,3,1], [1,2,4],
          [4,1,2], [2,4,2], [3,1,2], [4,2,4], [2,4,1], [1,2,3],
          [2,4,2,4], [4,1,2,4], [1,2,3,1], [1,2,4,2,4], [4,2,4,2,4],
          [3,1,2,4,2,4], [2,4,2,4,2,4]]=#
+
 #println(optimal_k_model(paths,3).P)
 #println(paths)
-println(optimal_multiorder(paths, 3).P) # Numbers slightly off from paper...
+#println(optimal_multiorder(paths, 3).P) # Numbers slightly off from paper...
+println(K_opt(paths, MatrixNetwork([1,2,2,3,4,4], [2,4,3,1,1,2]))[1])
