@@ -1,7 +1,8 @@
-include("Hypergraphs.jl")
-include("RandomHypergraphs.jl")
 using MatrixNetworks
 using SparseArrays
+using LinearAlgebra
+include("Hypergraphs.jl")
+include("RandomHypergraphs.jl")
 
 
 """
@@ -30,20 +31,15 @@ function to_adjacency_matrix(h::Hypergraphs; simple::Bool=false)
             for k = j+1:size(h.edges[i],1)
                 index1 = vertex_floor(h.edges[i][j])
                 index2 = vertex_floor(h.edges[i][k])
-                if simple
-                    adjacency_matrix[index1,index2] = adjacency_matrix[index2,index1] = 1 # Setting to 1 excludes multi-edges
-                else
-                    adjacency_matrix[index1,index2] += 1 # Incrementing tracks edge multiplicity
-                    adjacency_matrix[index2,index1] += 1
-                end
+                adjacency_matrix[index1,index2] += 1
+                adjacency_matrix[index2,index1] += 1
             end
         end
     end
 
-    if simple # Remove self-loops
-        for i = 1:h.n
-            adjacency_matrix[i,i] = 0
-        end
+    if simple
+        adjacency_matrix -= Diagonal(adjacency_matrix) # Remove self-loops
+        adjacency_matrix = min.(adjacency_matrix, 1) # Remove multi-edges
     end
 
     return adjacency_matrix
