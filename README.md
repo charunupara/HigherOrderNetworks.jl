@@ -1,1 +1,1 @@
-# Software for Higher-order Networks
+# Software for Higher-Order Networks
