@@ -1,6 +1,7 @@
 using MatrixNetworks
 using SparseArrays
 using StatsFuns
+using Dates
 """
 `K_Model`
 =========
@@ -17,7 +18,7 @@ struct K_Model
     P::Dict{Vector{Int64}, Float64}
 end
 
-Base.copy(M::K_Model) = K_Model(M.k, M.P)
+Base.copy(M::K_Model) = K_Model(M.k, deepcopy(M.P))
 
 """
 `k_model_k`
@@ -53,7 +54,7 @@ function optimal_k_model(S::Vector{Vector{Int64}}, k::Int64)
     w_counts = Dict{Vector{Int64}, Int64}() # Number of times a path of length `k-1` appears in S
     S_k = []
     for q in S
-        for i = 1:size(q,1)-k # Get all subpaths of q
+        for i = 1:size(q,1)-k # Get all k-subpaths of q
             p_k = q[i:i+k]
             w_k = p_k[1:k]
 
@@ -72,7 +73,7 @@ function optimal_k_model(S::Vector{Vector{Int64}}, k::Int64)
     end
 
     for p in Set(S_k)
-        P[p] = p_counts[p] / w_counts[p[1:k]] # Pr = proportion of paths identical to p[1:k] that end in p[k]
+        P[p] = log(p_counts[p] / w_counts[p[1:k]]) # Pr = proportion of paths identical to p[1:k] that end in p[k]
     end
     return k_model_k(k, P)
 end
@@ -123,17 +124,19 @@ Arguments
     - `S::Vector{Vector{Int64}}`: The observed paths
     - `K::Int64`: The maximum order of the model
 """
-function optimal_multiorder(S::Vector{Vector{Int64}}, K::Int64)
+function optimal_multiorder(S::Vector{Vector{Int64}}, K::Int64; Log=true) # TODO: Log space?
+    t1 = now()
     models = [optimal_k_model(S, k-1) for k = 1:K+1] # Generate each layer
+    println("Layer models generated for K=$K. Took $(now() - t1).")
     P = Dict{Vector{Int64}, Float64}()
 
     for p in S
-        P[p] = 1.0
+        P[p] = 0.0
         for k = 1:min(K,size(p,1)) # Multiply by probability in each layer. E.g., P(a,b,c) = P(a) * P(b|a) * P(c|a,b)
-            P[p] *= models[k].P[p[1:k]]
+            P[p] += models[k].P[p[1:k]]
         end
         for i = K+1:size(p,1) # Multiply by M_K+1 probability to produce path. For paths longer than K
-            P[p] *= models[K+1].P[p[i-K:i]]
+            P[p] += models[K+1].P[p[i-K:i]]
         end
     end
 
@@ -148,11 +151,19 @@ Computes the likelihood that a multi-order model `M_k` produces the observed pat
 
 Precondition: S ⊆ M_k.P.keys
 """
-function multiorder_likelihood(M_k::K_Model, S::Vector{Vector{Int64}})
+function multiorder_likelihood(M_k::K_Model, S::Vector{Vector{Int64}}; Log=true)
     @assert issubset(Set(S), keys(M_k.P))
+
+    if Log
+        l = 0.0
+        for p in S
+            l += M_k.P[p]
+        end
+        return l
+    end
     l = 1.0
     for p in S
-        l *= M_k.P[p] # Product of likelihood for each path
+        l *= M_k.P[p]
     end
     return l
 end
@@ -175,7 +186,9 @@ The optimal value for k and the corresponding multi-order model of order k
 """
 function K_opt(S::Vector{Vector{Int64}}, A::MatrixNetwork; p::Float64=0.01)
     K_opt = 1
+    t1 = now()
     M_k = optimal_multiorder(S, K_opt)
+    println("Initial k=1 model generated. Took $(now() - t1).")
 
     function p_value(M_k::K_Model, M_K::K_Model, S::Vector{Vector{Int64}})
         function matrix_df(A::Array{Bool,2}, k::Int64)
@@ -189,32 +202,40 @@ function K_opt(S::Vector{Vector{Int64}}, A::MatrixNetwork; p::Float64=0.01)
 
         M_kl = multiorder_likelihood(M_k, S)
         M_Kl = multiorder_likelihood(M_K, S)
+        println("k-Likelihood: $(M_kl)")
+        println("K-Likelihood: $(M_Kl)")
 
-        #println("$M_Kl, $M_kl")
+        println(M_Kl - M_kl)
 
         dfMk = df(M_k)
         dfMK = df(M_K)
-        return 1 - chisqcdf(2log(M_Kl/M_kl), dfMK-dfMk)
+        println("$dfMK, $dfMk")
+        return chisqcdf(dfMK-dfMk, 2(M_Kl-M_kl))
     end
 
     while true
+        t2 = now()
         M_K = optimal_multiorder(S, K_opt + 1)
-        #println(M_K.P == M_k.P)
-        if p_value(M_k, M_K, S) < p
+        println("Higher k=$(K_opt+1) model generated. Took $(now() - t1).")
+        t3 = now()
+        cp = p_value(M_k, M_K, S)
+        println("Comparative p-value between k=$K_opt and k=$(K_opt+1): $cp. Took $(now() - t3).")
+        if cp < p
             break
         else
             M_k = deepcopy(M_K)
             K_opt += 1
         end
     end
+    println("Done. k=$K_opt. Total analysis took $(now() - t1).")
     return K_opt, M_k
 end
 
 
 AL = [[2], [4,3], [1], [1,2]]
-#=paths = Vector{Vector{Int64}}()
+paths = Vector{Vector{Int64}}()
 
-for k = 1:5
+#=for k = 1:20
     append!(paths, generate_paths(AL, k))
 end=#
 #=paths = [[2,4], [2,3], [4,1], [4,2], [1,2], [2,3,1], [1,2,4],
@@ -225,4 +246,50 @@ end=#
 #println(optimal_k_model(paths,3).P)
 #println(paths)
 #println(optimal_multiorder(paths, 3).P) # Numbers slightly off from paper...
-println(K_opt(paths, MatrixNetwork([1,2,2,3,4,4], [2,4,3,1,1,2]))[1])
+#println("wheef")
+#println(K_opt(paths, MatrixNetwork([1,2,2,3,4,4], [2,4,3,1,1,2]))[1])
+
+function read_paths(filepath::String; frequency=false)
+    println("Begin reading $filepath.")
+    nodes = Dict()
+    paths = Array{Array{Int64,1},1}()
+    edges = Set{Tuple{Int64,Int64}}()
+    t1 = now()
+    open(filepath) do file
+        lines = [ln for ln in eachline(file)]
+        for ln in lines
+            separated = split(ln, ",")
+            p = []
+            for i = 1:(frequency ? length(separated)-1 : length(separated))
+                n = separated[i]
+                if !haskey(nodes,n)
+                    nodes[n] = length(nodes) + 1
+                end
+                if i < length(separated)-1 && !haskey(nodes,separated[i+1])
+                    nodes[separated[i+1]] = length(nodes) + 1
+                end
+                push!(p, nodes[n])
+                if i < length(separated)-1
+                    push!(edges, (nodes[n], nodes[separated[i+1]]))
+                end
+            end
+            if frequency
+                for i = 1:Int(parse(Float64, separated[length(separated)]))
+                    push!(paths, p)
+                end
+            else
+                push!(paths, p)
+            end
+        end
+    end
+    println("$(length(paths)) paths read, implying a network of $(length(nodes)) nodes and $(length(edges)) edges. Took $(now() - t1).")
+    return paths, MatrixNetwork(collect(edges), length(nodes))
+end
+
+flights = "US_flights.ngram"
+tube = "tube_paths_train.NGRAM"
+wiki = "data\\wikipedia_clickstreams.NGRAM"
+@time println(K_opt(read_paths("C:\\Users\\Elizabeth Turner\\Documents\\Josh\\MAP\\HO Networks\\Code\\$wiki")...)[1])
+
+# TODO: Include layers in multi-order models
+# TODO: Since multi model K is included in K+1, we can supply K to make generation faster
