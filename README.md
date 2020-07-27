@@ -6,7 +6,6 @@ This package contains algorithms to generate and analyze higher-order networks b
 ---
 
 ```
-
 using Pkg
 Pkg.add("HigherOrderNetworks")
 using HigherOrderNetworks
