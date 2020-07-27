@@ -1,6 +1,6 @@
 name = "HigherOrderNetworks"
 uuid = "6f6a334d-9044-495a-bc2b-8b1543872cbf"
-authors = ["Charun Upara <uparacha@grinnell.edu>"]
+authors = ["Nicole Eikmeier <eikmeier@grinnell.edu>", "Josh Turner <turnerjo@grinnell.edu>", "Charun Upara <uparacha@grinnell.edu>"]
 version = "0.1.0"
 
 [deps]
