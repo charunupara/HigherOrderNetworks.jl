@@ -14,6 +14,11 @@ function deg_distr(A::MatrixNetwork)
     return deg_dist
 end
 
+function nodes_by_deg(A::MatrixNetwork; descending=false)
+    distr = deg_distr(A)
+    return sort(collect(1:A.n), by=x->distr[x], rev=descending)
+end
+
 function outweight_distr(A::MatrixNetwork) # For unweighted, equal to outdegree distribution
     deg_dist = zeros(Int64, A.n)
     if eltype(A.vals) <: Real
