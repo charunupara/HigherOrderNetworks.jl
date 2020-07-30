@@ -1,1 +1,1 @@
-# Software for Higher-Order Networks
+# HigherOrderNetworks.jl
