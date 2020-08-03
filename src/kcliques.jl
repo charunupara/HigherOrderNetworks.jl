@@ -25,6 +25,7 @@ Fields
 mutable struct AdjacencyListGraph
     vals::Vector{Int64}
     n::Int64
+    D::Vector{Int64}
     list::Vector{Vector{Int64}}
 end
 
@@ -127,7 +128,7 @@ function k_cliques(A::MatrixNetwork, k::Int64)
         else
             # Numbers indicate steps of the pseudocode on pp. 216
 
-            if sum(G.D) == -G.n # No valid node, stop searching here
+            if sum(U.D) == -U.n # No valid node, stop searching here
                 return # This original step was not in the pseudocode
             end
 

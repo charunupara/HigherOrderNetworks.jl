@@ -7,8 +7,10 @@ Jure Leskovec. The original paper may be found at https://arxiv.org/pdf/1704.039
 """
 
 using MatrixNetworks
+using PyCall
 include("kcliques.jl") # Used to find cliques
 include("Utilities.jl") # Used to get degree distribution
+const typing_model = pyimport("YOUR_FILENAME_HERE.py") # Substitute in the Python file that handles typing model graph generation
 
 """
 `hocc`
@@ -77,3 +79,9 @@ function hocc(A::MatrixNetwork, l::Int64)
 
     return mean(cc), sum(clique_membership) / sum(wedge_membership)
 end
+
+G = typing_model.YOUR_TYPING_MODEL_GRAPH() # Subsitute in the correct function name
+M = MatrixNetwork(map(x->x[1], G.edges), map(x->x[2], G.edges))
+
+order = 2
+println(hocc(M, order))
