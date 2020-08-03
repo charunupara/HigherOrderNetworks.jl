@@ -1,3 +1,6 @@
+using SparseArrays
+using LinearAlgebra
+
 C(n,k) = factorial(big(n)) / (factorial(big(k)) * factorial(big(n-k))) # n choose k
 vertex_floor(s::Te) where Te <: Real = Int(floor(s)) # Make sure a node (stub or vertex) is in vertex form, i.e. an integer
 
@@ -68,4 +71,21 @@ function simplify(A::MatrixNetwork)
     M -= Diagonal(M)
     M = min.(M,1)
     return MatrixNetwork(sparse(M))
+end
+
+function make_undirected(A::MatrixNetwork)
+    arr = Array(sparse(A))
+    arr = triu(arr) + triu(arr)'
+    return MatrixNetwork(sparse(arr))
+end
+
+function clust(A::MatrixNetwork)
+    dd = deg_distr(A)
+    cc = clustercoeffs(A)
+    cc[isnan.(cc)] .= 0.0
+
+    wedge_count = [dd[i]*(dd[i]-1) for i = 1:length(dd)]
+    gcc = sum(cc .* wedge_count) / sum(wedge_count)
+
+    return mean(cc), gcc
 end
