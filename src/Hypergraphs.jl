@@ -223,7 +223,6 @@ function remove_edge!(h::Hypergraphs, e::Int64)
    end
    deleteat!(h.edges, e) # Remove edge
    h.m -= 1
-   end
 end
 
 """
