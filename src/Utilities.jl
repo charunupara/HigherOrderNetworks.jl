@@ -1,23 +1,46 @@
+"""
+Miscellaneous functions.
+"""
+
 using SparseArrays
 using LinearAlgebra
+using MatrixNetworks
 
-C(n,k) = factorial(big(n)) / (factorial(big(k)) * factorial(big(n-k))) # n choose k
-vertex_floor(s::Te) where Te <: Real = Int(floor(s)) # Make sure a node (stub or vertex) is in vertex form, i.e. an integer
+"""
+`deg_distr`
+===========
 
-function deg_distr(A::MatrixNetwork)
-    deg_dist = zeros(Int64, A.n)
-    for i = 1:size(A.rp,1)-1
-        deg_dist[i] += (A.rp[i+1] - A.rp[i])
-    end
+Gets the degree distribution of an undirected MatrixNetwork `A`.
+"""
+deg_distr(A::MatrixNetwork) = [A.rp[i+1]-A.rp[i] for i = 1:A.n]
 
-    return deg_dist
-end
+"""
+`nodes_by_deg`
+==============
 
-function nodes_by_deg(A::MatrixNetwork; descending=false)
+Returns the nodes of a MatrixNetwork sorted by degree.
+
+Arguments
+---------
+    - `A::MatrixNetwork`: The network to get the sorted nodes of
+    - `descending::Bool (=false)`: Whether the nodes are sorted by descending or
+                                   or ascending degree
+"""
+function nodes_by_deg(A::MatrixNetwork; descending::Bool=false)
     distr = deg_distr(A)
     return sort(collect(1:A.n), by=x->distr[x], rev=descending)
 end
 
+"""
+`outweight_distr`
+================
+
+Computes the weight going out of each node in a weighted MatrixNetwork.
+
+Returns
+-------
+    - A vector of Reals, where `d[i]` is the weight going out of the ith node.
+"""
 function outweight_distr(A::MatrixNetwork) # For unweighted, equal to outdegree distribution
     deg_dist = zeros(Int64, A.n)
     if eltype(A.vals) <: Real
@@ -32,6 +55,16 @@ function outweight_distr(A::MatrixNetwork) # For unweighted, equal to outdegree 
     return deg_dist
 end
 
+"""
+`inweight_distr`
+================
+
+Computes the weight coming into each node in a weighted MatrixNetwork.
+
+Returns
+-------
+    - A vector of Reals, where `d[i]` is the weight coming into the ith node.
+"""
 function inweight_distr(A::MatrixNetwork)
     deg_dist = zeros(Int64, A.n)
     if eltype(A.vals) <: Real
@@ -46,10 +79,27 @@ function inweight_distr(A::MatrixNetwork)
     return deg_dist
 end
 
+"""
+`total_edge_weights`
+====================
+
+Computes the total weight between all pairs of adjacent nodes in a MatrixNetwork.
+Can be either directed or undirected. In the undirected case, weights[[i,j]] = weights[[j,i]].
+
+Preconditions
+-------------
+    - The values of the MatrixNetwork are of type `Real`
+
+Returns
+-------
+    - A dictionary of pairs to Reals, where weights[[i,j]] is the total directed weight
+      from i to j.
+"""
 function total_edge_weights(A::MatrixNetwork)
+    @assert eltype(A.vals) <: Real
     weights = Dict{Vector{Int64}, eltype(A.vals)}()
     i = 1
-    for j = 1:size(A.ci,1)
+    for j = 1:length(A.ci)
         if j >= A.rp[i+1]
             i += 1
          end
@@ -62,10 +112,22 @@ function total_edge_weights(A::MatrixNetwork)
     return weights
 end
 
+"""
+`get_edges`
+===========
+
+Returns the edges of a MatrixNetwork.
+"""
 function get_edges(A::MatrixNetwork)
-    return [[i,j] for i = 1:size(A.rp,1)-1 for j in A.ci[A.rp[i]:A.rp[i+1]-1]]
+    return [(i,j) for i = 1:length(A.rp)-1 for j in A.ci[A.rp[i]:A.rp[i+1]-1]]
 end
 
+"""
+`simplify`
+==========
+
+Removes any self-loops and multi-edges from a MatrixNetwork.
+"""
 function simplify(A::MatrixNetwork)
     M = Array(sparse(A))
     M -= Diagonal(M)
@@ -73,13 +135,27 @@ function simplify(A::MatrixNetwork)
     return MatrixNetwork(sparse(M))
 end
 
+"""
+`make_undirected`
+=================
+
+Symmetrizes a MatrixNetwork.
+"""
 function make_undirected(A::MatrixNetwork)
     arr = Array(sparse(A))
     arr = triu(arr) + triu(arr)'
     return MatrixNetwork(sparse(arr))
 end
 
-function clust(A::MatrixNetwork)
+"""
+`clustering`
+============
+
+Calculates the global and average local clustering coefficients for a MatrixNetwork `A`.
+
+Output tuple is of the form `(lcc, gcc)`.
+"""
+function clustering(A::MatrixNetwork)
     dd = deg_distr(A)
     cc = clustercoeffs(A)
     cc[isnan.(cc)] .= 0.0

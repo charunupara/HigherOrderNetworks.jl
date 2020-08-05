@@ -65,7 +65,7 @@ Returns
 Example
 --------
 ~~~~
-assortativity(H; choice_function="top_bottom", method="pearson", samples = 100)
+assortativity(H; choice_function="top_bottom", method="pearson", samples=100)
 ~~~~
 """
 
@@ -87,8 +87,7 @@ function assortativity(H::Hypergraphs; choice_function::String="uniform", method
     pairs = choose_pairs(h, samples, choice_functions[choice_function])
 
     if method == "spearman"
-        # Rank degrees within each column. sortperm(sortperm(x)) replaces x[i] with
-        # with the index of x[i] in the sorted version of the list
+        # Rank degrees within each column
         pairs = [sortperm(sortperm(pairs[:,1])) sortperm(sortperm(pairs[:,2]))]
     end
 

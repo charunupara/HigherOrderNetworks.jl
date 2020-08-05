@@ -260,7 +260,7 @@ end
 `read_paths`
 ============
 
-Read in a collection of paths from a file.
+Read a collection of paths from a file.
 
 Each line must contain a single path with an optional frequency at the end to
 indicate the number of times to count the path.

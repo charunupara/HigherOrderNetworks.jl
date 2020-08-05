@@ -29,17 +29,18 @@ stub_matching([1], [2], ["foo"])
 ~~~~
 """
 function stub_matching(D::Vector{Int64}, K::Vector{Int64}; vals=ones(length(D)))
-   hypergraph = StubHypergraph(Vector{Vector{Float64}}(), 0, 0) # Blank hypergraph
-   stubs::Vector{Vector{Float64}} = [[i+(1/(n+1)) for n = 1:D[i]] for i = 1:size(D,1)]
+   hypergraph = Hypergraphs(Vector{Vector{Float64}}(), 0, 0) # Blank hypergraph
+   degs = copy(D)
+   valid_nodes = 1:length(D)
+
    for k = 1:size(K,1) # Iterate over edge dimension sequence
       edge = zeros(K[k]) # Empty edge of length K[k]
       for d = 1:K[k] # Choose K[k] random stubs for the edge
-         node = rand(stubs) # Node to get the stub from
-         stub = rand(node)
-         edge[d] = stub
-         setdiff!(node, [stub]) # Remove stub
-         if isempty(node)
-            setdiff!(stubs, [node])
+         node = rand(1:length(degs))
+         edge[d] = node
+         degs[node] -= 1 # Remove stub
+         if degs[node] == 0
+            setdiff!(valid_nodes, [node])
          end
       end
       push!(hypergraph.edges, sort(edge, by=x -> D[x], rev=true))
@@ -58,40 +59,30 @@ end
 
 Performs a pairwise reshuffle on the edges numbered `e1` and `e2`.
 
+Arguments
+---------
+   - `H::Hypergraphs`: The hypergraph containing the edges to shuffle
+   - `e1::Int64`: The index of the first edge
+   - `e2::Int64`: The index of the second edge
+
 Preconditions
 -------------
    - `e1, e2 ∈ (0,m]` where `m` is the number of edges in the hypergraph
+   - `e1 ≠ e2`
 
-A pairwise shuffle is an operation that randomly swaps nodes between
+A pairwise reshuffle is an operation that randomly swaps nodes between
 two edges while leaving their intersection intact. Stubs within the
 intersection may be exchanged. (pp. 6-7)
 
 Example
 -------
 ~~~~
-pairwise_reshuffle(stub_hypergraph, 1, 2)
+pairwise_reshuffle(H, 1, 2) # Shuffles edges 1 and 2
 ~~~~
 """
-function pairwise_reshuffle!(h::Hypergraphs, e1::Int64, e2::Int64)
-   @assert 0 < e1 <= h.m && 0 < e2 <= h.m # Edges to be reshuffled are valid
+function pairwise_reshuffle!(H::Hypergraphs, e1::Int64, e2::Int64)
+   @assert 0 < e1 <= H.m && 0 < e2 <= H.m && e1 != e2 # Edges to be reshuffled are valid
 
-   if typeof(h) <: VertexHypergraph # Call proper function
-      pairwise_reshuffle_v!(h, e1, e2)
-   else
-      pairwise_reshuffle_s!(h, e1, e2)
-   end
-
-   sort!(h.edges[e1], by=x -> h.D[vertex_floor(x)], rev=true)
-   sort!(h.edges[e2], by=x -> h.D[vertex_floor(x)], rev=true)
-end
-
-"""
-`pairwise_reshuffle_v!`
-=======================
-
-Perform a pairwise reshuffle between edges numbered `e1` and `e2` in a vertex-labeled hypergraph.
-"""
-function pairwise_reshuffle_v!(h::VertexHypergraph, e1::Int64, e2::Int64)
    inter = collect(edge_intersect(h, e1, e2)) # edge1 ⋂ edge2
    exclu = setdiff([h.edges[e1]; h.edges[e2]], inter) # (edge1 ⋃ edge2) \ inter
 
@@ -103,37 +94,9 @@ function pairwise_reshuffle_v!(h::VertexHypergraph, e1::Int64, e2::Int64)
    end
 
    h.edges[e2] = [inter; exclu] # Assign the rest to e2
-end
 
-"""
-`pairwise_reshuffle_s!`
-=======================
-
-Perform a pairwise reshuffle on edges at indices `e1` and `e2` in a stub-labeled hypergraph.
-"""
-function pairwise_reshuffle_s!(h::StubHypergraph, e1::Int64, e2::Int64)
-   inter = edge_intersect(h, e1, e2) # Get the set of intersection nodes
-   exclu = filter(x -> !(vertex_floor(x) in inter), [h.edges[e1]; h.edges[e2]]) # Get stubs that are not in intersection
-   filter!(x -> vertex_floor(x) in inter, h.edges[e1]) # Set e1 and e2 to only the stubs that are in the intersection
-   filter!(x -> vertex_floor(x) in inter, h.edges[e2])
-   sort!(h.edges[e1])
-   sort!(h.edges[e2])
-
-   for i = 1:length(inter) # Shuffle intersection stubs
-      if rand(Float64) <= 0.5
-         temp = h.edges[e1][i]
-         h.edges[e1][i] = h.edges[e2][i]
-         h.edges[e2][i] = temp
-      end
-   end
-
-   for i = 1:h.K[e1] - length(inter)
-      new_n = rand(exclu)
-      push!(h.edges[e1], new_n)
-      setdiff!(exclu, [new_n])
-   end
-
-   h.edges[e2] = [h.edges[e2]; exclu]
+   sort!(h.edges[e1], by=x -> H.D[x], rev=true)
+   sort!(h.edges[e2], by=x -> H.D[x], rev=true)
 end
 
 """
@@ -146,24 +109,22 @@ and edge-dimension sequences of a given hypergraph via random pairwise shuffling
 Arguments
 ---------
    - `intiial::Hypergraphs`: The hypergraph from which exploration begins
-   - `samples(=1000)`: The number of pairwise reshuffles to perform
+   - `samples::Int64 (=1000)`: The number of pairwise reshuffles to perform
+   - `type::String (="vertex")`: Which distribution to draw from. Choices are
+                                 "vertex" or "stub".
 
 Preconditions
 -------------
    - `samples > 0`
-
-Example
---------
-~~~~
-MCMC(vertex_hypergraph; 5000)
-~~~~
 """
-function MCMC(initial::Hypergraphs; samples::Int64=1000)
+function MCMC(initial::Hypergraphs; samples::Int64=1000, type::String="vertex")
    @assert samples > 0 # Positive number of samples
-   if typeof(initial) <: StubHypergraph
+   if type == "stub"
       return MCMC_s(initial; samples=samples)
-   else
+   elseif type == "vertex"
       return MCMC_v(initial; samples=samples)
+   else
+      error("Invalid type argument. Choices are 'vertex' and 'stub'.")
    end
 end
 
@@ -176,11 +137,11 @@ See `MCMC`.
 We generate a random stub-labeled hypergraph by performing a swap at every
 iteration of the loop.
 """
-function MCMC_s(initial::StubHypergraph; samples=1000)
+function MCMC_s(initial::Hypergraphs; samples=1000)
    c = copy(initial)
    for t = 1:samples
       sample_edges = random_edge_indices(c, 2) # Random pair of edges
-      pairwise_reshuffle_s!(c, sample_edges[1], sample_edges[2])
+      pairwise_reshuffle!(c, sample_edges[1], sample_edges[2])
    end
    return c
 end
@@ -194,10 +155,10 @@ See `MCMC`.
 To generate a random vertex-labeled hypergraph, we can't swap at every iteration;
 otherwise, we effectively perform the stub-labeled process, with the effect of
 biasing the end result towards vertex-labeled hypergraphs that have more equivalent
-realizations as stub-labeled hypergraphs. Thus, we must sample using the non-uniform
-distribution used below.
+realizations as stub-labeled hypergraphs. Thus, we must sample from the below
+distribution.
 """
-function MCMC_v(initial::VertexHypergraph; samples=1000)
+function MCMC_v(initial::Hypergraphs; samples=1000)
    k = 0 # Number of iterations performed
    n_rejected = 0 # Number of iterations in which a swap was rejected
 
@@ -259,7 +220,7 @@ function MCMC_v(initial::VertexHypergraph; samples=1000)
                end
             end
 
-            pairwise_reshuffle_v!(c, i, j) # Perform shuffle
+            pairwise_reshuffle!(c, i, j) # Perform shuffle
 
             new_ei = c.edges[i]
             new_ej = c.edges[j]
