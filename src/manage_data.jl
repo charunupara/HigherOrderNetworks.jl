@@ -4,6 +4,24 @@ function load_data(dataset::AbstractString)
     end
 end
 
+function read_txt(filename::AbstractString)
+    adj_matrix = fill(0, (4039, 4039))
+    open(filename) do file
+        for ln in eachline(file)
+            pieces = split(ln,' ', keepempty=false)
+            adj_matrix[(parse(Int64,pieces[1]) + 1), (parse(Int64,pieces[2]) + 1)] = 1
+        end
+    end
+
+    adj_matrix = sparse(adj_matrix)
+    adj_matrix = adj_matrix + adj_matrix'
+    adj_matrix = min.(adj_matrix, 1)
+    adj_matrix = MatrixNetwork(adj_matrix)
+
+    return adj_matrix
+    
+end
+
 # function load_data(dataset::AbstractString)
 #     pathname = joinpath(dirname(dirname(@__FILE__)),"data")
 #     file = joinpath(pathname, "$(dataset).txt")
