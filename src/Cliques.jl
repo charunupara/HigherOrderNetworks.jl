@@ -5,9 +5,9 @@ Based on "Arbority and Subgraph Listing Algorithms" by Norshige Chiba and Takao
 Nishizeki. The original paper may be found at
 https://pdfs.semanticscholar.org/0d19/245a27bc65a87a8014d5b8a66fb514c8ff0b.pdf?_ga=2.251120710.1988770043.1596204199-972144793.1596204199.
 """
-using MatrixNetworks
-using LinearAlgebra
-using SparseArrays
+# using MatrixNetworks
+# using LinearAlgebra
+# using SparseArrays
 
 function _kcliques(A::SparseMatrixCSC{T,Int64}, k::Int64) where T
     A = min.(A, 1)
@@ -163,7 +163,7 @@ iterations.
 function kcliques(A::MatrixNetwork, k::Int64) where T
     S = sparse(A)
     S = min.(S, 1)
-    S -= Diagonal(A)
+    S -= Diagonal(S)
     clique_counts = zeros(Int64, size(S, 1))
     (d, rt) = corenums(S)
     inds = findall(d .>= (k - 1))

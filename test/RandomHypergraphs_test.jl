@@ -1,5 +1,3 @@
-include("Hypergraphs.jl")
-include("RandomHypergraphs.jl")
 using Test
 
 @testset "RandomHypergraphs Tests" begin

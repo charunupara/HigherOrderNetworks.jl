@@ -34,8 +34,8 @@ function to_adjacency_matrix(H::Hypergraphs; simple::Bool=false)
     for i = 1:H.m
         for j = 1:length(H.edges[i])-1
             for k = j+1:length(H.edges[i])
-                index1 = h.edges[i][j]
-                index2 = h.edges[i][k]
+                index1 = H.edges[i][j]
+                index2 = H.edges[i][k]
                 A[index1,index2] += 1
                 A[index2,index1] += 1
             end

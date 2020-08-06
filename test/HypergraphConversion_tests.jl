@@ -1,6 +1,3 @@
-include("hypergraphs_conversions.jl")
-using Test
-
 @testset "hyper_to_matrix_tests" begin
     # Trivial graphs
     @test to_adjacency_matrix(Hypergraphs(Array{Int64,1}[], 1, 0))[1,:] == [0]
