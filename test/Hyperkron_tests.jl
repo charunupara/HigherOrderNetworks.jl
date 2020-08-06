@@ -1,6 +1,3 @@
-include("hyperkron.jl")
-using Test
-
 @testset "hyperkron_tests" begin
     @testset "num_multiset_permutations" begin
         @test num_multiset_permutations(Integer[]) == 1

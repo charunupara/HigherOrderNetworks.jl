@@ -1,24 +1,38 @@
+"""
+Hypergraph creation and manipulation.
+"""
+
 using MatrixNetworks
 using StatsBase
 include("Utilities.jl")
 
-abstract type Hypergraphs end
-
 """
-`VertexHypergraph{T}`
+`Hypergraphs{T}`
 =====================
-Represents a vertex-labeled hypergraph as a list of edges.
+
+Represents a vertex-labeled Hypergraphs as a list of edges.
 
 Fields
 ------
-   - `vals::Vector{T}`: The values corresponding to each node
+   - `vals::Vector{T}`: The values corresponding to each node (or hyperedge, depending on use case)
    - `n::Int64`: The number of nodes
    - `m::Int64`: The number of hyperedges
-   - `D::Vector{Int64}`: The degree sequence
-   - `K::Vector{Int64}`: The edge dimension sequence
+   - `D::Vector{Int64}`: The degree sequence, where `D[i] = degree of node i`
+   - `K::Vector{Int64}`: The edge dimension sequence, where `K[j] = size of edge j`
    - `edges::Vector{Vector{Int64}}`: The hyperedges and their members
+
+A hypergraph is a generalization of a graph in which edges can contain any number
+of nodes. So, for example, if we wanted to denote a three-way relationship between
+nodes 1, 2, and 3, the hypergraph would contain the edge `{1, 2, 3}`.
+
+Hypergraphs are useful because they allow us to more accurately indicate relationships
+among groups of things. Consider a coauthorship network. In a dyadic graph,
+we might represent a five-way collaboration as a 5-clique. While this does capture
+the fact that all pairs of authors have now appeared in a paper together, it doesn't seem
+right to categorize the event as 15 pairwise interactions. With a hypergraph, we
+can more succinctly and intuitively represent the event as a single hyperedge of five nodes.
 """
-mutable struct VertexHypergraph{T} <: Hypergraphs
+mutable struct Hypergraphs{T}
    vals::Vector{T}
    n::Int64
    m::Int64
@@ -28,144 +42,85 @@ mutable struct VertexHypergraph{T} <: Hypergraphs
 end
 
 """
-`StubHypergraph{T}`
-===================
-
-Represents a stub-labeled hypergraph as a list of edges.
-
-Fields
-------
-   - `vals::Vector{T}`: The values corresponding to each node
-   - `n::Int64`: The number of nodes
-   - `m::Int64`: The number of hyperedges
-   - `D::Vector{Int64}`: The degree sequence
-   - `K::Vector{Int64}`: The edge dimension sequence
-   - `edges::Vector{Vector{Float64}}`: The hyperedges and their members
-Note: The nth stub of node i is represented as `i + \\tfrac{1}{n+1}`.
-E.g., `2_2 \\rightarrow \\tfrac{7}{3}` and `4_1 \\rightarrow \\tfrac{9}{2}`
-"""
-mutable struct StubHypergraph{T} <: Hypergraphs
-   vals::Vector{T}
-   n::Int64
-   m::Int64
-   D::Vector{Int64}
-   K::Vector{Int64}
-   edges::Vector{Vector{Float64}}
-end
-
-"""
-`Hypergraph_kernel`
+`Hypergraphs_kernel`
 ===================
 
 Verifies that:
-   - The number of nodes == `m`
+   - The number of edges == `m`
    - The number of vals == `n`
    - All nodes are between 0 and `n`
-   - If StubHypergraph, that all stub numberings are valid and none are skipped
 
 If all conditions are met, returns degree and edge dimension sequences
 """
-function Hypergraph_kernel(edges::Vector{Vector{Te}}, vals::Vector{T},
-                           n::Int64, m::Int64) where Te <: Real where T
-   @assert size(edges, 1) == m # m is the number of edges
-   @assert size(vals, 1) == n # Each node has a val associated with it
-   @assert all([0 < edges[i][j] < n + 1 for i = 1:m for j = 1:size(edges[i], 1)]) # No node exceeds n
+function Hypergraphs_kernel(edges::Vector{Vector{Int64}}, vals::Vector{T},
+                           n::Int64, m::Int64) where T
+   @assert length(edges) == m # m is the number of edges
+   @assert length(vals) == n # Each node has a val associated with it
+   @assert all([0 < edges[i][j] < n + 1 for i = 1:m for j = 1:length(edges[i])]) # No node exceeds n
 
    D = zeros(Int64, n)
    K = zeros(Int64, m)
    for e = 1:m
       K[e] = size(edges[e],1)
       for v in edges[e]
-         D[vertex_floor(v)] += 1
+         D[v] += 1
       end
    end
-   edges = map(x -> sort!(x, by=v -> D[vertex_floor(v)], rev=true), edges) # Sort edge multisets by descending node degree
-
-   if Te == Float64
-      possible_stubs = [i + 1/(j+1) for i = 1:n for j = 1:D[i]]
-      @assert all([i in possible_stubs for k = 1:m for i in edges[k]]) # Valid stub numberings
-   end
+   edges = sort!.(edges, by=v -> D[v], rev=true) # Sort edges by descending node degree
 
    return D, K
 end
 
 """
-VertexHypergraph constructors
+`Hypergraphs` constructors
 =============================
 
 Functions
 ---------
-   - `VertexHypergraph(edges, vals, n, m)`: Produces a vertex-labeled hypergraph with the given edge set, values, and size
-   - `VertexHypergraph(edges, n, m)`: Produces a vertex-labeled hypergraph with the given edge set and size, with all values as 1.0
-   - `VertexHypergraph(s)`: Converts a stub-labeled hypergraph into a vertex-labeled hypergraph
+   - `Hypergraphs(edges, vals, n, m)`: Produces a hypergraph with the given edges, values, and size
+   - `Hypergraphs(edges, n, m)`: Produces a hypergraph with the given edge set and size, with all values as 1.0
+   - `Hypergraphs(edges)`: Produces a hypergraph with the given set of edges
 
 Examples
 --------
 ~~~~
-VertexHypergraph([[1,2], [3,4], [1,4]], ["One", "Two", "Three", "Four"], 4, 3)
-VertexHypergraph([[i,i+2] for i=1:3], 4, 3)
-VertexHypergraph(StubMatching([3,2,2,2], [4,3,2]))
+Hypergraphs([[1,2], [3,4], [1,4]], ["One", "Two", "Three", "Four"], 4, 3)
+Hypergraphs([[i,i+2] for i=1:3], 4, 3)
+Hypergraphs([[1,2,3], [2,4,6], [1,5]])
 ~~~~
 """
-function VertexHypergraph(edges::Vector{Vector{Int64}}, vals::Vector{T},
+function Hypergraphs(edges::Vector{Vector{Int64}}, vals::Vector{T},
                           n::Int64, m::Int64) where T
-   D, K= Hypergraph_kernel(edges, vals, n, m)
-   return VertexHypergraph(vals, n, m, D, K, edges)
+   D, K= Hypergraphs_kernel(edges, vals, n, m)
+   return Hypergraphs(vals, n, m, D, K, edges)
 end
 
-function VertexHypergraph(edges::Vector{Vector{Int64}}, n::Int64, m::Int64) 
-   return VertexHypergraph(edges, ones(n), n, m)
+function Hypergraphs(edges::Vector{Vector{Int64}}, n::Int64, m::Int64)
+   return Hypergraphs(edges, ones(n), n, m)
 end
 
-function VertexHypergraph(edges::Vector{Vector{Int64}})
-   return VertexHypergraph(edges, maximum([e[i] for e in edges for i = 1:size(e,1)]), size(edges,1))
+function Hypergraphs(edges::Vector{Vector{Int64}})
+   return Hypergraphs(edges, maximum([e[i] for e in edges for i = 1:length(e)]), length(edges))
 end
 
-function VertexHypergraph(filepath::String)
-   try
-      open(filepath) do file
-         lines = [ln for ln in eachline(file)]
-         edges = [map(x -> parse(Int64, x), split(ln, " ")) for ln in lines]
-         return VertexHypergraph(edges)
-      end
-   catch ex
-      print("Something bad happened!")
-   end
-end
-
-function VertexHypergraph(s::StubHypergraph)
-   return VertexHypergraph([vertex_floor.(s.edges[i]) for i = 1:s.m], s.vals, s.n, s.m)
-end
+Base.copy(H::Hypergraphs) = Hypergraphs(deepcopy(h.edges), deepcopy(h.vals), h.n, h.m)
 
 """
-StubHypergraph constructors
-===========================
+`add_node!`
+===========
 
-Functions
+Add a node with a specific value to the hypergraph.
+
+Arguments
 ---------
-   - `StubHypergraph(edges, vals, n, m)`: Produces a stub-labeled hypergraph with the given edge set, values, and size
-   - `StubHypergraph(edges, n, m)`: Produces a stub-labeled hypergraph with the given edge set and size, with all values as 1.0
-
-Examples
---------
-~~~~
-StubHypergraph([[1.33333333,2.5], [3.5,4.5], [1.5,4.33333333]], ["One", "Two", "Three", "Four"], 4, 3)
-StubHypergraph([[1.5,2.33333333], [1.33333333,2.5]], 2, 2)
-~~~~
+   - `H::Hypergraphs`: The hypergraph to add to
+   - `val::T`: The value to associate with the new node
 """
-function StubHypergraph(edges::Vector{Vector{Float64}}, vals::Vector{T},
-                        n::Int64, m::Int64) where T
-   D, K = Hypergraph_kernel(edges, vals, n, m)
-   return StubHypergraph(vals, n, m, D, K, edges)
+function add_node!(H::Hypergraphs, val::T) where T
+   H.n += 1
+   push!(H.D, 0)
+   push!(H.vals, val)
 end
-
-function StubHypergraph(edges::Vector{Vector{Float64}}, n::Int64, m::Int64)
-   return StubHypergraph(edges, ones(n), n, m)
-end
-
-Base.copy(h::VertexHypergraph) = VertexHypergraph(copy(h.edges), copy(h.vals), h.n, h.m) 
-Base.copy(h::StubHypergraph) = StubHypergraph(copy(h.edges), copy(h.vals), h.n, h.m) 
-
 
 """
 `add_node!`
@@ -173,57 +128,103 @@ Base.copy(h::StubHypergraph) = StubHypergraph(copy(h.edges), copy(h.vals), h.n, 
 
 Add a node to the hypergraph.
 """
-function add_node!(h::Hypergraphs)
-   #if typeof(h) <: VertexHypergraph
-
+function add_node!(H::Hypergraphs)
+   add_node!(H, nothing)
 end
 
 """
-`sorted_nodes`
-==============
+`add_edge!`
+===========
 
-Return the node list sorted by node degree.
+Add a hyperedge to a hypergraph.
+
+Arguments
+---------
+   - `V::Hypergraphs`: The hypergraph to add an edge to
+   - `e::Vector{Int64}`: The edge to add
 """
-function sorted_nodes(h::Hypergraphs)
-   return sort(collect(1:h.n), by=x -> h.D[x], rev=true)
+function add_edge!(V::Hypergraphs, e::Vector{Int64})
+   push!(V.edges, e)
+   push!(V.K, length(e))
+
+   for v in e
+      if v > V.n
+         add_node!(V)
+      end
+      V.D[v] += 1
+   end
+end
+
+"""
+`add_value_edge!`
+=================
+
+Add a hyperedge to a hypergraph by specifying the corresponding values to be linked.
+
+Arguments
+---------
+   - `V::Hypergraphs`: The hypergraph to add an edge to
+   - `e::Vector{T}`: The values to connect
+
+Example
+-------
+~~~~
+add_value_edge!(V, ["Kim", "Jim", "Tim"])
+~~~~
+"""
+function add_edge_by_value!(V::Hypergraphs, e::Vector{T}) where T
+   node_edge = []
+
+   for v in e
+      i = findfirst(x -> x==v, V.vals)
+      if i == -1
+         add_node!(V, v)
+         i = V.n + 1
+      end
+      V.D[i] += 1
+      push!(node_edge, i)
+   end
+
+   push!(V.edges, node_edge)
+   push!(V.K, length(node_edge))
 end
 
 """
 `remove_node!`
 ==============
 
-Delete the node at index `n` from a hypergraph. 
+Delete the node at index `n` from a hypergraph.
 """
-function remove_node!(h::Hypergraphs, n::Int64)
-   for i = 1:h.m
-      filter!(x -> vertex_floor(x) == n, h.edges[i]) # Remove from edge
-      map!(x -> x > n ? x - 1 : x, h.edges[i]) # Adjust node identities
-      if h.edges[i] == [] # Clear empty edges
-         deleteat!(h.edges, i)
-         deleteat!(h.K, i)
+function remove_node!(H::Hypergraphs, n::Int64)
+   for i = 1:H.m
+      filter!(x -> x == n, H.edges[i]) # Remove from edge
+      map!(x -> x > n ? x - 1 : x, H.edges[i]) # Adjust node identities
+      if H.edges[i] == [] # Clear empty edges
+         deleteat!(H.edges, i)
+         deleteat!(H.K, i)
       end
-      h.K[i] -= count(x -> x == n, vertex_floor.(h.edges[i])) # Edit edge dimension sequence
+      H.K[i] -= count(x -> x==n, H.edges[i]) # Edit edge dimension sequence
    end
 
-   deleteat!(h.D, n) # Remove from degree sequence
+   deleteat!(H.D, n) # Remove from degree sequence
 
-   h.n -= 1
-   h.m = size(h.edges,1)
+   H.n -= 1
+   H.m = length(H.edges)
 end
 
 """
 `remove_edge!`
 ==============
 
-Delete the edge at index `e` from a hypergraph. 
+Delete the edge at index `e` from a hypergraph.
 """
-function remove_edge!(h::Hypergraphs, e::Int64)
-   for n in h.edges[e]
-      h.D[vertex_floor(n)] -= 1 # Edit degree sequence
+function remove_edge!(H::Hypergraphs, e::Int64)
+   for n in H.edges[e]
+      H.D[n] -= 1 # Edit degree sequence
    end
-   deleteat!(h.edges, e) # Remove edge
-   h.m -= 1
-   end
+   deleteat!(H.edges, e) # Remove edge
+   deleteat!(H.K, e)
+   H.m -= 1
 end
 
 """
@@ -234,19 +235,18 @@ Get the set of intersection between two hyperdges. Returns a set of integers.
 
 Arguments
 ---------
-   - `h::Hypergraphs`: The hypergraph where the edges live
+   - `H::Hypergraphs`: The hypergraph where the edges live
    - `e1::Int64`: The index of the first edge
    - `e2::Int64`: The index of the second edge
 
 Examples
 --------
 ~~~~
-edge_intersect(VertexHypergraph([[1,3,5], [2,3,5], [3,5]], 1, 2)) -> {3, 5}
-edge_intersect(StubHypergraph([[1.5,3.33333333], [2.5,4.5,5.5], [3.5,5.33333333]], 1, 3)) -> {3}
+edge_intersect(Hypergraphs([[1,3,5], [2,3,5], [3,5]], 1, 2)) -> {3, 5}
 ~~~~
 """
-function edge_intersect(h::Hypergraphs, e1::Int64, e2::Int64)
-   return intersect(vertex_floor.(h.edges[e1]), vertex_floor.(h.edges[e2]))
+function edge_intersect(H::Hypergraphs, e1::Int64, e2::Int64)
+   return intersect(H.edges[e1], H.edges[e2])
 end
 
 """
@@ -257,11 +257,11 @@ Get the number of hyperedges parallel (multiset equal) to a given edge.
 
 Arguments
 ---------
-   - `h::Hypergraphs`: The hypergraph to be analyzed
+   - `H::Hypergraphs`: The hypergraph to be analyzed
    - `e::Int64`: The index of the edge
 """
-function num_parallel(h::Hypergraphs, e::Int64)
-   return count(x -> vertex_floor.(x) == vertex_floor.(h.edges[e]), h.edges)
+function num_parallel(H::Hypergraphs, e::Int64)
+   return count(x -> x == H.edges[e], H.edges)
 end
 
 """
@@ -276,19 +276,12 @@ Example
 random_edges(G, 3) -> [[e1], [e2], [e3]]
 ~~~~
 """
-function random_edges(h::Hypergraphs, n::Int64)
-   @assert 0 < n <= h.m # The number to be sampled is valid
-
-   edges_copy = copy(h.edges)
-   for i = 1:h.m - n
-      deleteat!(edges_copy, rand(1:size(edges_copy,1)))
-   end
-
-   return edges_copy
+function random_edges(H::Hypergraphs, n::Int64)
+   return H.edges[random_edge_indices(H, n)]
 end
 
 """
-`random_edges`
+`random_edge_indices`
 ==============
 
 Select `n` distinct random edge indices from a hypergraph.
@@ -299,40 +292,6 @@ Example
 random_edge_indices(G, 3) -> [e1, e2, e3]
 ~~~~
 """
-function random_edge_indices(h::Hypergraphs, n::Int64)
-   @assert 0 < n <= h.m
-
-   indices = [i for i = 1:h.m]
-   for i = 1:h.m - n
-      deleteat!(indices, rand(1:size(indices,1)))
-   end
-   return indices
+function random_edge_indices(H::Hypergraphs, n::Int64)
+   return sample(1:H.m, n, replace=false)
 end
-
-"""
-`hyper_to_bipartite`
-====================
-
-Converts a hypergraph into its bipartite representation. For all vertices v and
-edges e in the hypergraph, an edge (v, e) exists in the bipartite if and only if
-v ∈ e in the hypergraph.
-"""
-function hyper_to_bipartite(h::Hypergraphs)
-   di_edges::Vector{Vector{Int64}} = []
-
-   for i = 1:h.m
-      for j in h.edges[i]
-         push!(di_edges, [i + h.n, vertex_floor(j)])
-      end
-   end
-
-   return MatrixNetwork(di_edges, h.n + h.m)
-end
-
-"""
-`bipartite_to_hyper`
-====================
-
-Converts a bipartite graph into a hypergraph.
-"""
-function bipartite_to_hyper(b::MatrixNetwork) end # STUB
