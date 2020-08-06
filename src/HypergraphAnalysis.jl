@@ -15,7 +15,7 @@ Sample random pairs of nodes in the hypergraph that share an edge.
 
 Arguments
 ---------
-    - `H::Hypergraphs`: The hypergraph from which to select the pairs
+    - `H::Hypergraph`: The hypergraph from which to select the pairs
     - `n_pairs::Int64`: The number of pairs to sample
     - `choice_function::Function`: The method for choosing the nodes from each edge.
                                    Options are `uniform`, `top_2`, and `top_bottom`.
@@ -25,7 +25,7 @@ Returns
     - An `n_pairs` x 2 matrix, where each row is a pair and each entry is the
       degree of one of the nodes.
 """
-function choose_pairs(H::Hypergraphs, n_pairs::Int64, choice_function::Function)
+function choose_pairs(H::Hypergraph, n_pairs::Int64, choice_function::Function)
     candidates = filter(x -> H.K[x] >= 2, 1:H.m) # Filters out singleton edges
     if n_pairs > size(candidates,1) # Adjust n_pairs if too large
         n_pairs = size(candidates,1)
@@ -48,7 +48,7 @@ nodes of similar degree.
 
 Arguments
 ---------
-    - `H::Hypergraphs`: The hypergraph to be analyzed
+    - `H::Hypergraph`: The hypergraph to be analyzed
     - `choice_function::String (="uniform")`: The method used to select nodes from edges. Options are
                                                 - `"uniform"`, which selects two nodes from each edge u.a.r.,
                                                 - `"top_2"`, which selects the two highest-degree nodes from each edge, and
@@ -69,16 +69,16 @@ assortativity(H; choice_function="top_bottom", method="pearson", samples=100)
 ~~~~
 """
 
-function assortativity(H::Hypergraphs; choice_function::String="uniform", method::String="spearman", samples::Int64=H.m)
-    function uniform(H::Hypergraphs, e::Int64)
+function assortativity(H::Hypergraph; choice_function::String="uniform", method::String="spearman", samples::Int64=H.m)
+    function uniform(H::Hypergraph, e::Int64)
         return sample(H.edges[e], 2, replace=false)
     end
 
-    function top_2(H::Hypergraphs, e::Int64)
+    function top_2(H::Hypergraph, e::Int64)
         return shuffle(H.edges[e][1:2])
     end
 
-    function top_bottom(H::Hypergraphs, e::Int64)
+    function top_bottom(H::Hypergraph, e::Int64)
         return shuffle([H.edges[e][1], H.edges[e][H.K[e]]])
     end
 
@@ -103,7 +103,7 @@ have an intersection of size `j`. (pp. 14-15)
 
 Arguments:
 ----------
-    - `H::Hypergraphs`: The hypergraph to be analyzed
+    - `H::Hypergraph`: The hypergraph to be analyzed
     - `j::Int64`: The intersection size to look for
     - `k::Int64`: Edge size
     - `l::Int64`: Edge size
@@ -114,7 +114,7 @@ Example
 conditional_profile(H, 4, 6, 10)
 ~~~~
 """
-function conditional_profile(H::Hypergraphs, j::Int64, k::Int64, l::Int64)
+function conditional_profile(H::Hypergraph, j::Int64, k::Int64, l::Int64)
     if (j > k || j > l) # Can't have intersection of size j if edge size is less than j
         return 0
     end
@@ -148,11 +148,11 @@ Compute the average intersection size of all edges of sizes `k` and `l`. (pp. 15
 
 Arguments:
 ----------
-    - `H::Hypergraphs`: The hypergraph to be analyzed
+    - `H::Hypergraph`: The hypergraph to be analyzed
     - `k::Int64`: Edge size
     - `l::Int64`: Edge size
 """
-function conditional_average(H::Hypergraphs, k::Int64, l::Int64)
+function conditional_average(H::Hypergraph, k::Int64, l::Int64)
     k_i = findall(i -> H.K[i] == k, 1:H.m)
     if size(k_i) == 0
         return 0
@@ -182,10 +182,10 @@ Computes the probability that two randomly selected edges have an intersection o
 
 Arguments:
 ----------
-    - `H::Hypergraphs`: The hypergraph to be analyzed
+    - `H::Hypergraph`: The hypergraph to be analyzed
     - `j::Int64`: The intersection size to look for
 """
-function marginal_profile(H::Hypergraphs, j::Int64)
+function marginal_profile(H::Hypergraph, j::Int64)
     return mean(
                 [length(edge_intersect(h, x, y)) == j ? 1 : 0
                 for x in 1:H.m for y in x+1:H.m]

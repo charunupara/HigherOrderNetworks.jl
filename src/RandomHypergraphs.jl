@@ -6,7 +6,7 @@ Based on "Configuration Models of Random Hypergraphs" by Philip S. Chodrow.
 The original paper may be found at https://arxiv.org/abs/1902.09302.
 """
 
-include("Hypergraphs.jl") # Used for Hypergraph structs
+include("Hypergraph.jl") # Used for Hypergraph structs
 
 """
 `stub_matching`
@@ -29,7 +29,7 @@ stub_matching([1], [2], ["foo"])
 ~~~~
 """
 function stub_matching(D::Vector{Int64}, K::Vector{Int64}; vals=ones(length(D)))
-   hypergraph = Hypergraphs(Vector{Vector{Float64}}(), 0, 0) # Blank hypergraph
+   hypergraph = Hypergraph(Vector{Vector{Float64}}(), 0, 0) # Blank hypergraph
    degs = copy(D)
    valid_nodes = 1:length(D)
 
@@ -61,7 +61,7 @@ Performs a pairwise reshuffle on the edges numbered `e1` and `e2`.
 
 Arguments
 ---------
-   - `H::Hypergraphs`: The hypergraph containing the edges to shuffle
+   - `H::Hypergraph`: The hypergraph containing the edges to shuffle
    - `e1::Int64`: The index of the first edge
    - `e2::Int64`: The index of the second edge
 
@@ -80,7 +80,7 @@ Example
 pairwise_reshuffle(H, 1, 2) # Shuffles edges 1 and 2
 ~~~~
 """
-function pairwise_reshuffle!(H::Hypergraphs, e1::Int64, e2::Int64)
+function pairwise_reshuffle!(H::Hypergraph, e1::Int64, e2::Int64)
    @assert 0 < e1 <= H.m && 0 < e2 <= H.m && e1 != e2 # Edges to be reshuffled are valid
 
    inter = collect(edge_intersect(h, e1, e2)) # edge1 ⋂ edge2
@@ -108,7 +108,7 @@ and edge-dimension sequences of a given hypergraph via random pairwise shuffling
 
 Arguments
 ---------
-   - `intiial::Hypergraphs`: The hypergraph from which exploration begins
+   - `intiial::Hypergraph`: The hypergraph from which exploration begins
    - `samples::Int64 (=1000)`: The number of pairwise reshuffles to perform
    - `type::String (="vertex")`: Which distribution to draw from. Choices are
                                  "vertex" or "stub".
@@ -117,7 +117,7 @@ Preconditions
 -------------
    - `samples > 0`
 """
-function MCMC(initial::Hypergraphs; samples::Int64=1000, type::String="vertex")
+function MCMC(initial::Hypergraph; samples::Int64=1000, type::String="vertex")
    @assert samples > 0 # Positive number of samples
    if type == "stub"
       return MCMC_s(initial; samples=samples)
@@ -137,7 +137,7 @@ See `MCMC`.
 We generate a random stub-labeled hypergraph by performing a swap at every
 iteration of the loop.
 """
-function MCMC_s(initial::Hypergraphs; samples=1000)
+function MCMC_s(initial::Hypergraph; samples=1000)
    c = copy(initial)
    for t = 1:samples
       sample_edges = random_edge_indices(c, 2) # Random pair of edges
@@ -158,7 +158,7 @@ biasing the end result towards vertex-labeled hypergraphs that have more equival
 realizations as stub-labeled hypergraphs. Thus, we must sample from the below
 distribution.
 """
-function MCMC_v(initial::Hypergraphs; samples=1000)
+function MCMC_v(initial::Hypergraph; samples=1000)
    k = 0 # Number of iterations performed
    n_rejected = 0 # Number of iterations in which a swap was rejected
 
