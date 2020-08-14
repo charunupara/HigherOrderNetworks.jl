@@ -6,7 +6,6 @@ Based on "Configuration Models of Random Hypergraphs" by Philip S. Chodrow.
 The original paper may be found at https://arxiv.org/abs/1902.09302.
 """
 
-include("Hypergraph.jl") # Used for Hypergraph structs
 
 """
 `stub_matching`

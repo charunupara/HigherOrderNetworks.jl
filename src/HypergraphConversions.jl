@@ -6,8 +6,7 @@ Convert between hypergraph and bipartite representations.
 using MatrixNetworks
 using SparseArrays
 using LinearAlgebra
-include("Hypergraphs.jl")
-include("RandomHypergraphs.jl")
+
 
 
 """
@@ -27,7 +26,7 @@ Examples
 to_adjacency_matrix(Hypergraphs([[1,2,3,4], [3,4,1], [1,4,5]], ["One", "Two", "Three", "Four", "Five"], 5, 3); simple=true)
 ~~~~
 """
-function to_adjacency_matrix(H::Hypergraphs; simple::Bool=false)
+function to_adjacency_matrix(H::Hypergraph; simple::Bool=false)
     A = zeros(Int64, H.n, H.n) # Create adjacency matrix of size n x n
 
     # Loop through each hyperedge and create edges in the new adjacency matrix
@@ -69,7 +68,7 @@ Examples
 hypergraph_to_matrixnetwork(Hypergraphs([[1,2,3,4], [3,4,1], [1,4,5]], ["One", "Two", "Three", "Four", "Five"], 5, 3); simple=true)
 ~~~~
 """
-function hypergraph_to_matrixnetwork(H::Hypergraphs; simple=false)
+function hypergraph_to_matrixnetwork(H::Hypergraph; simple=false)
     return MatrixNetwork(sparse(to_adjacency_matrix(H; simple=simple)))
 end
 
@@ -82,7 +81,7 @@ Converts a hypergraph into its bipartite representation. For all vertices v and
 edges e in the hypergraph, an edge (v, e) exists in the bipartite if and only if
 v ∈ e in the hypergraph.
 """
-function hyper_to_bipartite(H::Hypergraphs)
+function hyper_to_bipartite(H::Hypergraph)
    di_edges::Vector{Vector{Int64}} = []
 
    for i = 1:h.m

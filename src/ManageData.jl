@@ -4,22 +4,6 @@ function load_data(dataset::AbstractString)
     end
 end
 
-# function load_data(dataset::AbstractString)
-#     pathname = joinpath(dirname(dirname(@__FILE__)),"data")
-#     file = joinpath(pathname, "$(dataset).txt")
-
-#     if isfile(file)
-#         return load_facebook_data()
-#     else
-#         error("Dataset does not exist")
-#     end
-# end
-
-function add_data(filename::AbstractString)
-    filename_begins = findlast(isequal('/'), filename)
-    fname_without_directory = filename[filename_begins:length(filename)]
-    cp(filename, joinpath("../data/", fname_without_directory), force=true)
-end
 
 function load_facebook_data()
     pathname = joinpath(dirname(dirname(@__FILE__)),"data")

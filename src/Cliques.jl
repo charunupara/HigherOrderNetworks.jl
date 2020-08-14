@@ -171,3 +171,8 @@ function kcliques(A::MatrixNetwork, k::Int64) where T
     clique_counts[inds] = counts
     return clique_counts, cliques
 end
+
+
+function kcliques(edges::Vector{Vector{Int64}})
+    
+end
