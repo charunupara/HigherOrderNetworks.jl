@@ -4,10 +4,13 @@ Algorithm for finding k-cliques (complete subgraphs of order k).
 Based on "Arbority and Subgraph Listing Algorithms" by Norshige Chiba and Takao
 Nishizeki. The original paper may be found at
 https://pdfs.semanticscholar.org/0d19/245a27bc65a87a8014d5b8a66fb514c8ff0b.pdf?_ga=2.251120710.1988770043.1596204199-972144793.1596204199.
+
+Code copied from https://github.com/arbenson/HigherOrderClustering.jl/blob/master/src/cliques.jl
 """
-# using MatrixNetworks
-# using LinearAlgebra
-# using SparseArrays
+
+using MatrixNetworks
+using LinearAlgebra
+using SparseArrays
 
 function _kcliques(A::SparseMatrixCSC{T,Int64}, k::Int64) where T
     A = min.(A, 1)
@@ -170,9 +173,4 @@ function kcliques(A::MatrixNetwork, k::Int64) where T
     counts, cliques = _kcliques(S[inds, inds], k)
     clique_counts[inds] = counts
     return clique_counts, cliques
-end
-
-
-function kcliques(edges::Vector{Vector{Int64}})
-    
 end
